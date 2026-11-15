@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 1';
+const VER='Ver.cardio 2';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1128,6 +1128,7 @@ function extrasScenario(sc){
   setTags(tagsFor(sc));
 }
 function extrasFrame(real,dt,t,L,R,now){lastLR=[L,R];
+  if(camAnim){const k=Math.min(1,(performance.now()-camAnim.s)/700),e=ease(k);camera.position.lerpVectors(camAnim.p0,camAnim.p1,e);controls.target.lerpVectors(camAnim.q0,TARGET,e);if(k>=1){camAnim=null;controls.enableDamping=true;}}
   SU.uPulse.value=.5+.5*Math.sin(now*.006);
   {const fI=sim.sc.flags||{},pu=SU.uPulse.value;['lad','rca'].forEach(k=>{const on=!proc.reperf&&((fI.infarct==='ant'&&k==='lad')||(fI.infarct==='inf'&&k==='rca')||fI.isch===k);corMats[k].emissive.setRGB(on?.25+.75*pu:0,on&&fI.isch?.3*pu:0,on?.08*pu:0);});}
   if(axG.visible)for(const q of axL){const v=Math.min(1,Math.abs(lead[q.i])*1.4);q.mat.opacity=.28+.72*v;q.sp.material.opacity=.6+.4*v;}
@@ -1146,6 +1147,10 @@ function extrasFrame(real,dt,t,L,R,now){lastLR=[L,R];
   if(tags.length){const w=view.clientWidth,h=view.clientHeight;for(const g of tags){deformPt(g.p,tmp);tmp.project(camera);if(!g.w)g.w=g.el.offsetWidth;g.el.style.transform='translate3d('+clamp((tmp.x+1)/2*w,6,Math.max(6,w-g.w-16)).toFixed(1)+'px,'+clamp((1-tmp.y)/2*h,56,h-64).toFixed(1)+'px,0) translate(10px,-50%)';g.el.style.display=tmp.z<1?'':'none';}}
 }
 
+const DIR0=new V3(1.2,.9,11).sub(TARGET).normalize();let camAnim=null;
+function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360),d=Math.max((h<420?3.6:3.25)/t,2.6/(t*camera.aspect));
+  camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
+$('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
 sizeAll();setOpacity();setCut();applyTheme();
 setScenario(SC.find(s=>'#'+s.id===location.hash)||SC[0]);
 window.addEventListener('hashchange',()=>{const s=SC.find(x=>'#'+x.id===location.hash);if(s&&s!==sim.sc)setScenario(s);});
