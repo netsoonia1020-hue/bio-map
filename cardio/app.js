@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 1';
+const VER='Ver.cardio 5';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -77,7 +77,7 @@ const V3=THREE.Vector3,HM=window.HEART,LD=HM.land.L;
 const v3=a=>new V3(a[0],a[1],a[2]);
 const view=$('view'),glc=$('gl');
 const renderer=new THREE.WebGLRenderer({canvas:glc,antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,innerWidth<700?1.5:2));renderer.localClippingEnabled=true;
+const PRMAX=Math.min(devicePixelRatio||1,3);renderer.setPixelRatio(PRMAX);renderer.localClippingEnabled=true;
 const scene=new THREE.Scene();
 {const c=document.createElement('canvas');c.width=16;c.height=256;const x=c.getContext('2d'),g=x.createLinearGradient(0,0,0,256);
  g.addColorStop(0,'#0b1826');g.addColorStop(.55,'#070e18');g.addColorStop(1,'#04070c');x.fillStyle=g;x.fillRect(0,0,16,256);scene.background=new THREE.CanvasTexture(c);}
@@ -329,7 +329,7 @@ function stepParticles(dt,S){
 /* 후처리 (발광) */
 let composer=null,bloom=null,glowOn=true;
 try{
-  const rt=renderer.capabilities.isWebGL2?new THREE.WebGLMultisampleRenderTarget(8,8,{format:THREE.RGBAFormat}):undefined;
+  const rt=renderer.capabilities.isWebGL2?(()=>{const r=new THREE.WebGLMultisampleRenderTarget(8,8,{format:THREE.RGBAFormat});r.samples=Math.min(8,renderer.capabilities.maxSamples||4);return r;})():undefined;
   composer=new THREE.EffectComposer(renderer,rt);composer.addPass(new THREE.RenderPass(scene,camera));
   bloom=new THREE.UnrealBloomPass(new THREE.Vector2(256,256),.28,.4,.93);composer.addPass(bloom);
 }catch(e){composer=null;}
@@ -502,7 +502,7 @@ function sizeAll(){
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
   if(composer){composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);}
   if(!userMoved){const t=Math.tan(camera.fov*Math.PI/360),d=Math.max((h<420?3.6:3.25)/t,2.6/(t*camera.aspect));camera.position.sub(TARGET).setLength(d).add(TARGET);}
-  dpr=Math.min(devicePixelRatio||1,2);eW=ecgC.clientWidth;eH=ecgC.clientHeight;ecgC.width=Math.max(1,eW*dpr);ecgC.height=Math.max(1,eH*dpr);
+  dpr=Math.min(devicePixelRatio||1,3);eW=ecgC.clientWidth;eH=ecgC.clientHeight;ecgC.width=Math.max(1,eW*dpr);ecgC.height=Math.max(1,eH*dpr);
 }
 new ResizeObserver(sizeAll).observe(view);new ResizeObserver(sizeAll).observe(ecgC);
 
@@ -780,7 +780,7 @@ pci:{steps(){return[{d:2.4,cam:[260,140,1],cap:'플라크가 내강을 좁혀 �
   etx(c,270,cy+H0+26,'플라크 (지질핵 + 섬유막)','#ffcf70',11,'center');etx(c,60,cy-H0-24,'혈류 →','#ffb0a8',11.5,'left','600');
  }},
 shock:{steps(o){const a={vf:'심실 전체가 무질서하게 흥분해 떨기만 합니다 → 박출 없음',af:'심방이 무질서하게 흥분하고, 심실은 불규칙하게 뜁니다',afl:'우심방 안에서 재진입 회로가 계속 돕니다',vt:'심실의 이소성 초점·회로가 빠르게 심실을 몰아갑니다'}[o.from];
-  return[{d:3.4,cam:[260,150,1],cap:a},{d:2.8,cam:[260,150,1.06],cap:o.sync?'패드 부착 · 충전 · R파에 동기화 (sync) — T파에 충격이 가면 VF 위험':'즉시 CPR, 패드 부착 · 충전 — 동기화 없이 바로 제세동'},
+  const stb=o.from==='af'||o.from==='afl';return[{d:stb?5:3.4,cam:[260,150,1],cap:stb?'안정 시엔 rate control·항응고가 먼저 — 아래는 불안정(저혈압·쇼크·흉통·심부전)할 때의 처치':a},{d:2.8,cam:[260,150,1.06],cap:o.sync?'패드 부착 · 충전 · R파에 동기화 (sync) — T파에 충격이 가면 VF 위험':'즉시 CPR, 패드 부착 · 충전 — 동기화 없이 바로 제세동'},
   {d:1.1,cam:[260,150,1.14],cap:'방전: 심근 전체를 한꺼번에 탈분극시킵니다'},{d:1.7,cam:[260,150,1.06],cap:'모든 세포가 동시에 불응기 → 무질서한 회로가 끊깁니다'},{d:4.6,cam:[260,150,1],cap:'동방결절이 다시 주도권을 잡아 동리듬이 돌아옵니다'}];},
  draw(c,T,si,p,now,o,st){
   heartBase(c,{lv:0,rv:0,at:0,dim:1});condDim(c);const t0=st[2].t0,t4=st[4].t0;
@@ -842,7 +842,7 @@ hf:{steps(){const pe=!!(sim.sc.flags||{}).pedema;return[{d:3.8,cam:[300,172,1.3]
  }}
 };
 const PACE0={sbrady:{blk:0,slowA:1,cap0:'동방결절이 느리게 발화해 심박출량이 부족합니다'},junc:{blk:0,noA:1,cap0:'동방결절 대신 접합부가 느리게 박동을 만듭니다'}};
-const EXMAP={nsr:{m:'flow'},stach:{m:'cond'},af:{m:'cond',t:'shock',to:{from:'af',sync:1},tn:'치료 · 동기화 심율동전환'},afl:{m:'cond',t:'shock',to:{from:'afl',sync:1},tn:'치료 · 동기화 심율동전환'},
+const EXMAP={nsr:{m:'flow'},stach:{m:'cond'},af:{m:'cond',t:'shock',to:{from:'af',sync:1},tn:'불안정 시 · 동기화 심율동전환'},afl:{m:'cond',t:'shock',to:{from:'afl',sync:1},tn:'불안정 시 · 동기화 심율동전환'},
  svt:{m:'cond',t:'adeno',tn:'치료 · adenosine'},vt:{m:'cond',t:'shock',to:{from:'vt',sync:1},tn:'치료 · 동기화 심율동전환'},tdp:{m:'cond',t:'shock',to:{from:'vf',sync:0},tn:'치료 · 제세동'},
  sbrady:{m:'cond',t:'pace',to:PACE0.sbrady,tn:'치료 · 심박조율'},junc:{m:'cond',t:'pace',to:PACE0.junc,tn:'치료 · 심박조율'},avb1:{m:'cond'},wb:{m:'cond'},m2:{m:'cond',t:'pace',to:{},tn:'치료 · 심박조율'},chb:{m:'cond',t:'pace',to:{},tn:'치료 · 심박조율'},
  lbbb:{m:'cond'},rbbb:{m:'cond'},pvc:{m:'cond'},isch:{m:'mi',t:'pci',tn:'시술 · PCI'},stA:{m:'mi',t:'pci',tn:'시술 · PCI'},stI:{m:'mi',t:'pci',tn:'시술 · PCI'},hk:{m:'cond'},hf:{m:'hf'},pedema:{m:'hf'},
@@ -1128,10 +1128,11 @@ function extrasScenario(sc){
   setTags(tagsFor(sc));
 }
 function extrasFrame(real,dt,t,L,R,now){lastLR=[L,R];
+  if(camAnim){const k=Math.min(1,(performance.now()-camAnim.s)/700),e=ease(k);camera.position.lerpVectors(camAnim.p0,camAnim.p1,e);controls.target.lerpVectors(camAnim.q0,TARGET,e);if(k>=1){camAnim=null;controls.enableDamping=true;}}
   SU.uPulse.value=.5+.5*Math.sin(now*.006);
   {const fI=sim.sc.flags||{},pu=SU.uPulse.value;['lad','rca'].forEach(k=>{const on=!proc.reperf&&((fI.infarct==='ant'&&k==='lad')||(fI.infarct==='inf'&&k==='rca')||fI.isch===k);corMats[k].emissive.setRGB(on?.25+.75*pu:0,on&&fI.isch?.3*pu:0,on?.08*pu:0);});}
   if(axG.visible)for(const q of axL){const v=Math.min(1,Math.abs(lead[q.i])*1.4);q.mat.opacity=.28+.72*v;q.sp.material.opacity=.6+.4*v;}
-  fpsE=fpsE*.95+real*.05;if(++fpsN>90){fpsN=0;const mx=Math.min(devicePixelRatio||1,innerWidth<700?1.5:2);let pr=renderer.getPixelRatio();
+  fpsE=fpsE*.95+real*.05;if(++fpsN>90){fpsN=0;const mx=PRMAX;let pr=renderer.getPixelRatio();
     if(fpsE>.024&&pr>1)pr=Math.max(1,pr-.25);else if(fpsE<.0125&&pr<mx)pr=Math.min(mx,pr+.25);
     if(pr!==renderer.getPixelRatio()){renderer.setPixelRatio(pr);sizeAll();}}
   // 박출 파면 (대동맥·폐동맥 벽을 따라 진행)
@@ -1146,6 +1147,10 @@ function extrasFrame(real,dt,t,L,R,now){lastLR=[L,R];
   if(tags.length){const w=view.clientWidth,h=view.clientHeight;for(const g of tags){deformPt(g.p,tmp);tmp.project(camera);if(!g.w)g.w=g.el.offsetWidth;g.el.style.transform='translate3d('+clamp((tmp.x+1)/2*w,6,Math.max(6,w-g.w-16)).toFixed(1)+'px,'+clamp((1-tmp.y)/2*h,56,h-64).toFixed(1)+'px,0) translate(10px,-50%)';g.el.style.display=tmp.z<1?'':'none';}}
 }
 
+const DIR0=new V3(1.2,.9,11).sub(TARGET).normalize();let camAnim=null;
+function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360),d=Math.max((h<420?3.6:3.25)/t,2.6/(t*camera.aspect));
+  camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
+$('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
 sizeAll();setOpacity();setCut();applyTheme();
 setScenario(SC.find(s=>'#'+s.id===location.hash)||SC[0]);
 window.addEventListener('hashchange',()=>{const s=SC.find(x=>'#'+x.id===location.hash);if(s&&s!==sim.sc)setScenario(s);});
