@@ -158,6 +158,8 @@ dt{color:var(--dim)}dd{margin:0}
 .dock #ecg{grid-column:1;grid-row:2;width:100%;height:100%}
 .dock #strip{grid-column:1;grid-row:3;width:100%;height:100%;border-top:1px solid var(--line)}
 .dock .tiles{grid-column:2;grid-row:2}
+.dock.zoom .tiles{display:none}
+.dock.zoom #ecg{grid-column:1/-1}
 .dock .dhead{grid-row:1}
 .dhead .ttl{font-size:11.5px;color:var(--ink);letter-spacing:.03em;font-weight:500}
 @media (max-width:980px){
