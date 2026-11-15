@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>간·담낭 3D 시뮬레이터</title>
+<style>
+:root{--bg:#060b12;--glass:rgba(13,22,33,.72);--line:rgba(120,190,220,.18);--line2:rgba(120,190,220,.34);--ink:#e6eef5;--dim:#8fa3b5;--accent:#57d3e6;color-scheme:dark}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+nav{position:absolute;left:12px;top:12px;display:flex;gap:2px;padding:3px;z-index:3}
+nav a{padding:6px 14px;border-radius:7px;color:var(--dim);text-decoration:none;font-size:13px}
+nav a.on{background:#142233;color:var(--accent);box-shadow:inset 0 0 0 1px var(--line2)}
+.ver{position:absolute;right:12px;top:14px;font-size:11.5px;color:var(--dim);padding:5px 10px;z-index:3}
+.bar{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:center;z-index:3}
+.tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;font-size:12px;color:var(--dim)}
+.tools label{display:flex;align-items:center;gap:7px}input[type=range]{accent-color:var(--accent);width:110px}
+.ib{background:transparent;border:1px solid var(--line);border-radius:7px;padding:4px 10px;font:inherit;color:var(--dim);cursor:pointer}
+.call{position:absolute;left:0;top:0;z-index:4;padding:7px 11px;max-width:250px;pointer-events:none;display:none;border-color:var(--line2);will-change:transform}
+.call b{display:block;font-size:13px}.call span{font-size:11.5px;color:var(--dim)}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<nav class="glass"><a href="../cardio/">심장</a><a class="on" href="./">간·담낭</a></nav>
+<div class="ver glass">Ver.hepato 0 · 기초 뼈대 (준비 중)</div>
+<div class="call glass" id="call"><b></b><span></span></div>
+<div class="bar"><div class="tools glass">
+  <label for="op">간 투명도 <input id="op" type="range" min="0" max="100" value="55"></label>
+  <label><input type="checkbox" id="ctx" checked> 주변 장기</label>
+  <button class="ib" id="reset" type="button">시점 초기화</button>
+  <span>부위를 탭하면 이름이 표시됩니다</span>
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="hepato-model.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id),V3=THREE.Vector3,H=window.HEPATO;
+const renderer=new THREE.WebGLRenderer({canvas:$('gl'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,3));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x060b12);
+const camera=new THREE.PerspectiveCamera(30,1,.1,80),TARGET=new V3(.2,-.5,.2),POS0=new V3(.6,.4,14);camera.position.copy(POS0);
+const controls=new THREE.OrbitControls(camera,$('gl'));controls.target.copy(TARGET);controls.enableDamping=true;controls.update();
+scene.add(new THREE.HemisphereLight(0xcfe4ff,0x1a1014,.6));const k=new THREE.DirectionalLight(0xfff1e6,.75);k.position.set(-2.5,3.5,6);scene.add(k);
+const r2=new THREE.DirectionalLight(0x58c8ff,.45);r2.position.set(3,1.5,-5);scene.add(r2);
+function b64(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;}
+function geo(n){const P=H.parts[n],i16=new Int16Array(b64(P.p)),pos=new Float32Array(i16.length);for(let i=0;i<i16.length;i++)pos[i]=i16[i]/H.q;
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(P.w===2?new Uint16Array(b64(P.i)):new Uint32Array(b64(P.i)),1));g.computeVertexNormals();return g;}
+const NAME={liver:['간 (Liver)','우엽·좌엽. 담즙 생성, 해독, 대사'],gb:['담낭 (Gallbladder)','담즙을 농축·저장'],duo:['십이지장 (Duodenum)','총담관과 췌관이 열리는 곳 (Vater 팽대부)'],panc:['췌장 (Pancreas)','소화효소와 insulin 분비'],pduct:['췌관 (Pancreatic duct)','췌액을 십이지장으로'],
+  cha:['총간동맥 (Common hepatic a.)','복강동맥에서 간으로'],celiac:['복강동맥 (Celiac trunk)','간·위·비장 동맥의 뿌리'],smv:['상장간막정맥 (SMV)','간문맥으로 합류'],splv:['비정맥 (Splenic v.)','간문맥으로 합류'],stomach:['위 (Stomach)','주변 장기'],ivc:['하대정맥 (IVC)','간정맥이 합류'],
+  pvn:['간문맥 (Portal vein) · 도식','장·비장의 혈액을 간으로 (메시 없음, 도식)'],bile:['담도 (Biliary tree) · 도식','간관 → 총담관 → 십이지장. 담낭관이 합류 (메시 없음, 도식)']};
+const COL={liver:0x8e3b32,gb:0x4f9a52,duo:0xd9a38a,panc:0xe3c27a,pduct:0xf0e0a0,cha:0xe0483c,celiac:0xe0483c,smv:0x4a6fe0,splv:0x4a6fe0,stomach:0xcf8f86,ivc:0x3c60c8};
+const picks=[],ctxM=[];let liverM;
+Object.keys(H.parts).forEach(n=>{const tr=n==='liver'||n==='stomach';const m=new THREE.Mesh(geo(n),new THREE.MeshStandardMaterial({color:COL[n],roughness:.5,transparent:tr,opacity:n==='stomach'?.35:1,depthWrite:!tr,side:THREE.DoubleSide}));
+  m.userData.k=n;m.renderOrder=tr?5:2;scene.add(m);picks.push(m);if(n==='liver')liverM=m;if(n==='stomach'||n==='duo'||n==='panc')ctxM.push(m);});
+// 메시가 없는 구조는 도식 튜브로 (위치는 추정값. 다음 단계에서 해부 랜드마크로 보정)
+const tube=(pts,r,col,key)=>{const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p=>new V3(p[0],p[1],p[2]))),40,r,10,false),new THREE.MeshStandardMaterial({color:col,roughness:.35}));m.userData.k=key;m.renderOrder=3;scene.add(m);picks.push(m);return m;};
+const hil=[-.3,-.5,.35],conf=[.3,-1.05,.3],amp=[-.8,-1.62,.0];
+tube([conf,[.05,-.8,.3],hil,[-.75,-.2,.3]],.09,0x5b6fe6,'pvn');tube([hil,[-.1,-.25,.1],[.6,.0,.2]],.07,0x5b6fe6,'pvn');
+tube([[-.9,-.15,.35],hil,[-.45,-.95,.3],[-.7,-1.35,.15],amp],.05,0x58b86a,'bile');tube([[.5,-.1,.3],[-.05,-.35,.35],hil],.045,0x58b86a,'bile');
+{const g=H.info.gb,neck=[g.max[0],g.max[1],g.min[2]+.2];tube([neck,[-.52,-.62,.4],[-.42,-.8,.33]],.035,0x58b86a,'bile');}
+const call=$('call'),ray=new THREE.Raycaster(),nd=new THREE.Vector2();let sel=null,down=null;
+$('gl').addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
+$('gl').addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;const r=$('gl').getBoundingClientRect();nd.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(nd,camera);
+  let hs=ray.intersectObjects(picks.filter(m=>m.visible),false);if(!hs.length){sel=null;call.style.display='none';return;}
+  let h=hs[0];if(h.object===liverM&&liverM.material.opacity<.6){const inn=hs.find(x=>x.object!==liverM&&x.object.userData.k!=='stomach');if(inn)h=inn;}
+  const n=NAME[h.object.userData.k];sel=h.point.clone();call.firstChild.textContent=n[0];call.lastChild.textContent=n[1];call.style.display='block';});
+$('op').addEventListener('input',()=>{const o=Math.max(.05,1-$('op').value/100);liverM.material.opacity=o;liverM.material.depthWrite=o>.98;});$('op').dispatchEvent(new Event('input'));
+$('ctx').addEventListener('change',e=>ctxM.forEach(m=>{m.visible=e.target.checked;}));
+$('reset').addEventListener('click',()=>{camera.position.copy(POS0);controls.target.copy(TARGET);fit();});
+function fit(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();const t=Math.tan(camera.fov*Math.PI/360),d=Math.max(3.2/t,3.4/(t*camera.aspect));camera.position.sub(controls.target).setLength(d).add(controls.target);}
+addEventListener('resize',fit);fit();
+const tmp=new V3();(function loop(){requestAnimationFrame(loop);controls.update();if(sel){tmp.copy(sel).project(camera);call.style.transform='translate3d('+Math.min(innerWidth-210,Math.max(8,(tmp.x+1)/2*innerWidth+14))+'px,'+((1-tmp.y)/2*innerHeight-20)+'px,0)';}renderer.render(scene,camera);})();
+})();
+</script>
+</body>
+</html>
