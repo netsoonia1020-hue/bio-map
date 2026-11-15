@@ -4,7 +4,7 @@
 
 ## 장기 목록
 
-- `cardio/` — 응급실 리듬별 3D 심장 시뮬레이터 (Ver.cardio 5). `cardio/index.html`을 브라우저로 열면 됩니다.
+- `cardio/` — 응급실 리듬별 3D 심장 시뮬레이터 (Ver.cardio 6). `cardio/index.html`을 브라우저로 열면 됩니다.
 
 ## 출처 / 라이선스
 
