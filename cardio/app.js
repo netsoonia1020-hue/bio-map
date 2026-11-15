@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 4';
+const VER='Ver.cardio 5';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -780,7 +780,7 @@ pci:{steps(){return[{d:2.4,cam:[260,140,1],cap:'플라크가 내강을 좁혀 �
   etx(c,270,cy+H0+26,'플라크 (지질핵 + 섬유막)','#ffcf70',11,'center');etx(c,60,cy-H0-24,'혈류 →','#ffb0a8',11.5,'left','600');
  }},
 shock:{steps(o){const a={vf:'심실 전체가 무질서하게 흥분해 떨기만 합니다 → 박출 없음',af:'심방이 무질서하게 흥분하고, 심실은 불규칙하게 뜁니다',afl:'우심방 안에서 재진입 회로가 계속 돕니다',vt:'심실의 이소성 초점·회로가 빠르게 심실을 몰아갑니다'}[o.from];
-  return[{d:3.4,cam:[260,150,1],cap:a},{d:2.8,cam:[260,150,1.06],cap:o.sync?'패드 부착 · 충전 · R파에 동기화 (sync) — T파에 충격이 가면 VF 위험':'즉시 CPR, 패드 부착 · 충전 — 동기화 없이 바로 제세동'},
+  const stb=o.from==='af'||o.from==='afl';return[{d:stb?5:3.4,cam:[260,150,1],cap:stb?'안정 시엔 rate control·항응고가 먼저 — 아래는 불안정(저혈압·쇼크·흉통·심부전)할 때의 처치':a},{d:2.8,cam:[260,150,1.06],cap:o.sync?'패드 부착 · 충전 · R파에 동기화 (sync) — T파에 충격이 가면 VF 위험':'즉시 CPR, 패드 부착 · 충전 — 동기화 없이 바로 제세동'},
   {d:1.1,cam:[260,150,1.14],cap:'방전: 심근 전체를 한꺼번에 탈분극시킵니다'},{d:1.7,cam:[260,150,1.06],cap:'모든 세포가 동시에 불응기 → 무질서한 회로가 끊깁니다'},{d:4.6,cam:[260,150,1],cap:'동방결절이 다시 주도권을 잡아 동리듬이 돌아옵니다'}];},
  draw(c,T,si,p,now,o,st){
   heartBase(c,{lv:0,rv:0,at:0,dim:1});condDim(c);const t0=st[2].t0,t4=st[4].t0;
@@ -842,7 +842,7 @@ hf:{steps(){const pe=!!(sim.sc.flags||{}).pedema;return[{d:3.8,cam:[300,172,1.3]
  }}
 };
 const PACE0={sbrady:{blk:0,slowA:1,cap0:'동방결절이 느리게 발화해 심박출량이 부족합니다'},junc:{blk:0,noA:1,cap0:'동방결절 대신 접합부가 느리게 박동을 만듭니다'}};
-const EXMAP={nsr:{m:'flow'},stach:{m:'cond'},af:{m:'cond',t:'shock',to:{from:'af',sync:1},tn:'치료 · 동기화 심율동전환'},afl:{m:'cond',t:'shock',to:{from:'afl',sync:1},tn:'치료 · 동기화 심율동전환'},
+const EXMAP={nsr:{m:'flow'},stach:{m:'cond'},af:{m:'cond',t:'shock',to:{from:'af',sync:1},tn:'불안정 시 · 동기화 심율동전환'},afl:{m:'cond',t:'shock',to:{from:'afl',sync:1},tn:'불안정 시 · 동기화 심율동전환'},
  svt:{m:'cond',t:'adeno',tn:'치료 · adenosine'},vt:{m:'cond',t:'shock',to:{from:'vt',sync:1},tn:'치료 · 동기화 심율동전환'},tdp:{m:'cond',t:'shock',to:{from:'vf',sync:0},tn:'치료 · 제세동'},
  sbrady:{m:'cond',t:'pace',to:PACE0.sbrady,tn:'치료 · 심박조율'},junc:{m:'cond',t:'pace',to:PACE0.junc,tn:'치료 · 심박조율'},avb1:{m:'cond'},wb:{m:'cond'},m2:{m:'cond',t:'pace',to:{},tn:'치료 · 심박조율'},chb:{m:'cond',t:'pace',to:{},tn:'치료 · 심박조율'},
  lbbb:{m:'cond'},rbbb:{m:'cond'},pvc:{m:'cond'},isch:{m:'mi',t:'pci',tn:'시술 · PCI'},stA:{m:'mi',t:'pci',tn:'시술 · PCI'},stI:{m:'mi',t:'pci',tn:'시술 · PCI'},hk:{m:'cond'},hf:{m:'hf'},pedema:{m:'hf'},

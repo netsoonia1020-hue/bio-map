@@ -31,7 +31,7 @@ return [
   lab:[138,3.6,101,1.18,1.6,1.0],abg:[7.43,36,78,23,1.9,-1],tn:18,
   ecg:['RR 간격이 불규칙하게 불규칙','P파 없음, 기저선에 미세한 f파','QRS는 좁음'],
   heart:'심방 전체에 무질서한 소파동이 돌아다녀 심방이 수축하지 못하고 떨기만 합니다. AV node가 일부만 통과시켜 심실은 불규칙하게 뜁니다. 충만 시간이 짧은 박동은 박출량이 적습니다.',
-  er:['불안정(저혈압, 쇼크, 허혈성 흉통, 급성 심부전): 동기화 심율동전환','안정: rate control (diltiazem 또는 β차단제)','발생 시점과 뇌졸중 위험 평가 후 항응고 결정','WPW 동반이 의심되면 AV node 차단제 금기'],
+  er:['불안정(저혈압, 쇼크, 허혈성 흉통, 급성 심부전): 즉시 동기화 심율동전환','안정: 먼저 rate control (diltiazem 또는 β차단제)','발생 48시간 이상 또는 시점 불명: 3주 이상 항응고 후, 또는 TEE로 좌심방 혈전 배제 후 심율동전환','CHA₂DS₂-VASc로 뇌졸중 위험 평가 후 항응고 결정','WPW 동반이 의심되면 AV node 차단제 금기'],
   flags:{afib:1},base:afBase,real:{org:'junc',mechRR:1},
   step:s=>{const rr=.3+Math.random()*.29;addV(s.t,{rr,mech:clamp((rr-.18)/.34,.35,1),org:'junc'});s.t+=rr;}},
  {g:'빈맥 · Tachyarrhythmia',id:'afl',name:'심방조동 2:1 (Atrial flutter)',tag:'150',sev:'warn',status:'주의',
