@@ -3,78 +3,198 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>간·담낭 3D 시뮬레이터</title>
+<title>응급실 간·담낭 3D 시뮬레이터</title>
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="간·담낭">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#060b12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#060b12;--glass:rgba(13,22,33,.72);--line:rgba(120,190,220,.18);--line2:rgba(120,190,220,.34);--ink:#e6eef5;--dim:#8fa3b5;--accent:#57d3e6;color-scheme:dark}
-*{box-sizing:border-box}html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;overflow:hidden}
-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+:root{
+  /* layout: full-bleed 3D stage with floating glass controls; tabbed chart card on the right; vitals + key-lab dock under the stage. Dark only, matching the cardio module. */
+  --bg:#060b12;--glass:rgba(13,22,33,.72);--solid:#0d1621;--raise:#142233;--line:rgba(120,190,220,.16);--line2:rgba(120,190,220,.32);
+  --ink:#e6eef5;--dim:#8fa3b5;--accent:#57d3e6;--bile:#a6e36a;
+  --ok:#4fd08a;--warn:#f2b84b;--crit:#ff5d66;--pop:rgba(10,18,28,.95);
+  --body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 348px;height:100%;min-height:620px;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .glass{background:var(--glass);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
-nav{position:absolute;left:12px;top:12px;display:flex;gap:2px;padding:3px;z-index:3}
-nav a{padding:6px 14px;border-radius:7px;color:var(--dim);text-decoration:none;font-size:13px}
-nav a.on{background:#142233;color:var(--accent);box-shadow:inset 0 0 0 1px var(--line2)}
-.ver{position:absolute;right:12px;top:14px;font-size:11.5px;color:var(--dim);padding:5px 10px;z-index:3}
-.bar{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:center;z-index:3}
-.tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 12px;font-size:12px;color:var(--dim)}
-.tools label{display:flex;align-items:center;gap:7px}input[type=range]{accent-color:var(--accent);width:110px}
-.ib{background:transparent;border:1px solid var(--line);border-radius:7px;padding:4px 10px;font:inherit;color:var(--dim);cursor:pointer}
-.call{position:absolute;left:0;top:0;z-index:4;padding:7px 11px;max-width:250px;pointer-events:none;display:none;border-color:var(--line2);will-change:transform}
+.view{position:relative;flex:1;min-height:300px;overflow:hidden}
+.view>canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.top{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;pointer-events:none;z-index:4}
+.top>*{pointer-events:auto}
+.picker{display:flex;align-items:stretch;min-width:0}
+.picker button{background:transparent;border:0;padding:8px 10px}
+.picker .nav{color:var(--dim);font-size:15px}
+#pick{display:flex;align-items:center;gap:9px;min-width:0;border-left:1px solid var(--line);border-right:1px solid var(--line);padding:6px 12px}
+#pick .t{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.25}
+#pick .t small{font-size:10.5px;color:var(--dim)}
+#pick .t b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44vw}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sev,var(--dim));box-shadow:0 0 8px var(--sev,transparent);flex:none}
+.organ{display:inline-flex;padding:3px;gap:2px}
+.organ a{padding:6px 12px;border-radius:7px;color:var(--dim);text-decoration:none;font-size:12.5px;white-space:nowrap}
+.organ a[aria-current]{background:var(--raise);color:var(--accent);box-shadow:inset 0 0 0 1px var(--line2)}
+.pop{position:absolute;z-index:6;left:12px;top:64px;width:min(720px,calc(100% - 24px));max-height:calc(100% - 80px);overflow:auto;padding:12px 14px 14px;display:none;background:var(--pop)}
+.pop.on{display:block}
+.pop h3{font-size:10.5px;font-weight:500;color:var(--accent);letter-spacing:.08em;margin:10px 0 6px}
+.pop h3:first-child{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+.sc{display:flex;align-items:center;gap:8px;text-align:left;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+.sc:hover{border-color:var(--line2);background:var(--raise)}
+.sc[aria-pressed="true"]{border-color:var(--accent);background:var(--raise)}
+.sc span{flex:1;min-width:0;line-height:1.3}
+.phase{position:absolute;left:12px;top:64px;display:flex;align-items:center;gap:10px;padding:7px 12px;pointer-events:none;font-size:14px;font-weight:600;z-index:3}
+.phase .pd{width:9px;height:9px;border-radius:50%;background:var(--bile);box-shadow:0 0 10px var(--bile)}
+.hint{position:absolute;right:14px;top:66px;font-size:11px;color:var(--dim);pointer-events:none;text-align:right;z-index:3}
+.call{position:absolute;left:0;top:0;will-change:transform;z-index:5;transform:translate(16px,-50%);padding:7px 11px;max-width:250px;pointer-events:none;display:none;border-color:var(--line2)}
 .call b{display:block;font-size:13px}.call span{font-size:11.5px;color:var(--dim)}
+.tag{position:absolute;left:0;top:0;will-change:transform;z-index:3;font-size:12px;font-weight:500;padding:3px 9px;border-radius:7px;background:rgba(214,36,56,.92);color:#fff;white-space:nowrap;pointer-events:auto;cursor:pointer;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 0 14px rgba(255,60,80,.55)}
+.tag.ok{background:rgba(22,128,78,.94);box-shadow:0 0 0 1px rgba(255,255,255,.25),0 0 12px rgba(60,220,130,.5)}
+.tag b{font-weight:600}.tag small{display:block;font-size:9.5px;font-weight:400;opacity:.9;line-height:1.2}
+.tag::before{content:"";position:absolute;left:-12px;top:calc(50% - 4px);width:8px;height:8px;border-radius:50%;background:#ff4458;box-shadow:0 0 10px #ff4458}
+.tag.ok::before{background:#3ddc84;box-shadow:0 0 10px #3ddc84}
+.tag::after{content:"";position:absolute;left:-21px;top:calc(50% - 13px);width:26px;height:26px;border-radius:50%;border:2px solid #ff4458;animation:tr 1.5s ease-out infinite;pointer-events:none}
+.tag.ok::after{border-color:#3ddc84}
+@keyframes tr{from{transform:scale(.45);opacity:1}to{transform:scale(1.3);opacity:0}}
+@media (prefers-reduced-motion:reduce){.tag::after{animation:none}}
+.bar{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:center;pointer-events:none;z-index:4}
+.tools{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 12px;padding:7px 12px;max-width:100%}
+.tools label{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dim);white-space:nowrap}
+.tools output{font-family:var(--mono);font-size:10.5px;color:var(--ink);min-width:30px}
+input[type=range]{width:100px;accent-color:var(--accent);height:16px}
+.ib{background:transparent;border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:12px;color:var(--dim);white-space:nowrap}
+.ib[aria-pressed="true"],.ib[aria-expanded="true"]{color:var(--accent);border-color:var(--line2);background:var(--raise)}
+.seg{display:inline-flex;gap:2px}
+.seg button{background:transparent;border:0;border-radius:7px;padding:5px 9px;font-size:12px;color:var(--dim);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--raise);color:var(--accent);box-shadow:inset 0 0 0 1px var(--line2)}
+.layers{position:absolute;z-index:6;right:12px;bottom:66px;padding:10px 12px;display:none;flex-direction:column;gap:6px;background:var(--pop)}
+.layers.on{display:flex}
+.layers label{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.layers input{accent-color:var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:10.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:7px;margin-top:2px;max-width:220px}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle}
+#expl{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);width:min(640px,calc(100% - 16px));padding:12px 14px 14px;display:none;background:var(--pop);max-height:calc(100% - 12px);overflow:auto;border-radius:10px;border:1px solid var(--line)}
+#expl.on{display:block}
+#expl .exh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+#exT{font-size:15px;font-weight:600}
+#exTopics{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+#exC{display:block;width:100%;height:auto;aspect-ratio:520/340;max-height:52vh;border-radius:8px;background:#04080d}
+#exD{font-size:13px;line-height:1.6;margin:10px 0 0}
+#exD ul{margin:0;padding-left:18px}
+.dock{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:auto auto;background:#04080d;border-top:1px solid var(--line)}
+.tile{padding:6px 12px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid rgba(255,255,255,.05)}
+.tile small{font-size:10px;letter-spacing:.06em;opacity:.8}
+.tile b{font-family:var(--mono);font-weight:500;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.t-hr{color:#6ff09a}.t-bp{color:#ff6b72}.t-tp{color:#ffb86b}.t-sp{color:#62d6ff}.t-rr{color:#f4d35e}
+.chips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-top:1px solid var(--line)}
+.chip{display:flex;gap:6px;align-items:baseline;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11.5px;color:var(--dim)}
+.chip b{font-family:var(--mono);font-weight:500;color:var(--ink);font-size:13px}
+.chip.hi b,.chip.lo b{color:var(--warn)}.chip.xx b{color:var(--crit)}
+.side{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--line);background:var(--solid)}
+.shead{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.shead .brand{font-size:11px;color:var(--dim);letter-spacing:.04em;margin-bottom:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;padding:1px 9px;border-radius:999px;border:1px solid var(--sev);color:var(--sev)}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sev)}
+.shead h1{font-size:18px;margin:6px 0 0;font-weight:600;text-wrap:balance;line-height:1.3}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+.tabs button{background:transparent;border:0;border-bottom:2px solid transparent;padding:9px 4px;font-size:12.5px;color:var(--dim)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.pane{flex:1;overflow:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px}
+.pane h3{font-size:10.5px;font-weight:500;color:var(--accent);letter-spacing:.08em;margin:0 0 5px}
+.pane p,.pane ul{margin:0}.pane ul{padding-left:17px}.pane li{margin:3px 0}
+dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}dt{color:var(--dim)}dd{margin:0}
+.lab{display:grid;grid-template-columns:1fr auto auto;gap:0 12px;align-items:baseline}
+.lab>div{display:contents}.lab span{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.lab .n{color:var(--dim)}.lab .v{font-family:var(--mono);text-align:right;font-size:14px}.lab .r{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:right}
+.lab .hi .v,.lab .lo .v{color:var(--warn)}.lab .xx .v{color:var(--crit)}
+.lab .hi .v::after{content:" ↑"}.lab .lo .v::after{content:" ↓"}.lab .xx.hi .v::after{content:" ↑↑"}.lab .xx.lo .v::after{content:" ↓↓"}
+.note{font-size:11px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px}
+@media (max-width:980px){
+  html,body{height:auto}
+  .app{display:flex;flex-direction:column;height:auto;min-height:0}
+  .view{flex:none;height:64svh;min-height:440px}
+  .dock{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .tile{padding:5px 8px}.tile b{font-size:16px}.tile small{font-size:9px}
+  .side{border-left:0;border-top:1px solid var(--line)}
+  .pane{overflow:visible}
+  .hint{display:none}
+  input[type=range]{width:74px}
+  .tools{gap:6px 10px;padding:6px 9px;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+  .tools>*{flex:none}
+  #pick .t b{max-width:34vw;font-size:14px}
+  .phase{top:62px;font-size:13px}
+}
 </style>
 </head>
 <body>
-<canvas id="gl"></canvas>
-<nav class="glass"><a href="../cardio/">심장</a><a class="on" href="./">간·담낭</a></nav>
-<div class="ver glass">Ver.hepato 0 · 기초 뼈대 (준비 중)</div>
-<div class="call glass" id="call"><b></b><span></span></div>
-<div class="bar"><div class="tools glass">
-  <label for="op">간 투명도 <input id="op" type="range" min="0" max="100" value="55"></label>
-  <label><input type="checkbox" id="ctx" checked> 주변 장기</label>
-  <button class="ib" id="reset" type="button">시점 초기화</button>
-  <span>부위를 탭하면 이름이 표시됩니다</span>
-</div></div>
+<div class="app">
+  <main class="main">
+    <div class="view" id="view">
+      <canvas id="gl"></canvas>
+      <div class="top">
+        <div class="picker glass">
+          <button type="button" class="nav" id="prev" aria-label="이전 케이스">‹</button>
+          <button type="button" id="pick" aria-haspopup="true" aria-expanded="false"><i class="dot" id="pickDot"></i><span class="t"><small>케이스 선택</small><b id="pickName"></b></span><span style="color:var(--dim);font-size:10px">▼</span></button>
+          <button type="button" class="nav" id="next" aria-label="다음 케이스">›</button>
+        </div>
+        <nav class="organ glass" aria-label="장기"><a id="toCardio" href="../cardio/">심장</a><a aria-current="page" href="./">간·담낭</a></nav>
+      </div>
+      <div class="pop glass" id="pop"></div>
+      <div class="phase glass"><span class="pd"></span><b id="phaseName">공복 · 담낭 저장</b></div>
+      <div class="hint">부위를 탭하면 이름 · 빨간 표지를 누르면 해설</div>
+      <div id="tags"></div>
+      <div id="expl" role="dialog" aria-labelledby="exT"><div class="exh"><b id="exT"></b><button type="button" class="ib" id="exX">닫기</button></div><div id="exTopics"></div><canvas id="exC"></canvas><div id="exD"></div></div>
+      <div class="call glass" id="call"><b></b><span></span></div>
+      <div class="layers glass" id="layers">
+        <label><input type="checkbox" id="lyBile" checked> 담도·담즙 흐름</label>
+        <label><input type="checkbox" id="lyPv" checked> 간문맥</label>
+        <label><input type="checkbox" id="lyHa" checked> 간동맥</label>
+        <label><input type="checkbox" id="lyHv" checked> 간정맥·하대정맥</label>
+        <label><input type="checkbox" id="lyCtx" checked> 주변 장기 (위·비장)</label>
+        <div class="legend"><span><i style="background:#a6e36a"></i>담즙</span><span><i style="background:#9a7cff"></i>간문맥</span><span><i style="background:#ff6b6b"></i>간동맥</span><span><i style="background:#5b8cff"></i>간정맥</span><span><i style="background:#ffe08a"></i>췌액</span></div>
+      </div>
+      <div class="bar"><div class="tools glass">
+        <label for="op">간 투명도 <input id="op" type="range" min="0" max="100" value="62"><output id="opO">62%</output></label>
+        <div class="seg" role="group" aria-label="보기" id="vmode"><button type="button" data-v="all" aria-pressed="true">전체</button><button type="button" data-v="bile">담즙</button><button type="button" data-v="blood">혈류</button></div>
+        <button type="button" class="ib" id="tMeal" aria-pressed="false">식사 (CCK)</button>
+        <button type="button" class="ib" id="tReset">시점 초기화</button>
+        <button type="button" class="ib" id="tPause" aria-pressed="false">일시정지</button>
+        <button type="button" class="ib" id="tLayers" aria-expanded="false">레이어</button>
+      </div></div>
+    </div>
+    <div class="dock">
+      <div class="tile t-hr"><small>HR /min</small><b id="vHR">--</b></div>
+      <div class="tile t-bp"><small>BP mmHg</small><b id="vBP">--</b></div>
+      <div class="tile t-tp"><small>Temp °C</small><b id="vTP">--</b></div>
+      <div class="tile t-sp"><small>SpO₂ %</small><b id="vSP">--</b></div>
+      <div class="tile t-rr"><small>RR /min</small><b id="vRR">--</b></div>
+      <div class="chips" id="chips"></div>
+    </div>
+  </main>
+  <aside class="side">
+    <div class="shead"><div class="brand" id="brand">응급실 간·담낭 3D 시뮬레이터</div><span class="pill" id="stPill"></span><h1 id="stName"></h1></div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button type="button" role="tab" data-v="st" aria-selected="true">상태</button><button type="button" role="tab" data-v="lab">검사</button><button type="button" role="tab" data-v="img">영상</button><button type="button" role="tab" data-v="er">처치</button><button type="button" role="tab" data-v="cav">주의</button>
+    </div>
+    <div class="pane" id="pane"></div>
+  </aside>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="hepato-model.js"></script>
-<script>
-(function(){
-'use strict';
-const $=id=>document.getElementById(id),V3=THREE.Vector3,H=window.HEPATO;
-const renderer=new THREE.WebGLRenderer({canvas:$('gl'),antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,3));
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x060b12);
-const camera=new THREE.PerspectiveCamera(30,1,.1,80),TARGET=new V3(.2,-.5,.2),POS0=new V3(.6,.4,14);camera.position.copy(POS0);
-const controls=new THREE.OrbitControls(camera,$('gl'));controls.target.copy(TARGET);controls.enableDamping=true;controls.update();
-scene.add(new THREE.HemisphereLight(0xcfe4ff,0x1a1014,.6));const k=new THREE.DirectionalLight(0xfff1e6,.75);k.position.set(-2.5,3.5,6);scene.add(k);
-const r2=new THREE.DirectionalLight(0x58c8ff,.45);r2.position.set(3,1.5,-5);scene.add(r2);
-function b64(s){const b=atob(s),u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;}
-function geo(n){const P=H.parts[n],i16=new Int16Array(b64(P.p)),pos=new Float32Array(i16.length);for(let i=0;i<i16.length;i++)pos[i]=i16[i]/H.q;
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setIndex(new THREE.BufferAttribute(P.w===2?new Uint16Array(b64(P.i)):new Uint32Array(b64(P.i)),1));g.computeVertexNormals();return g;}
-const NAME={liver:['간 (Liver)','우엽·좌엽. 담즙 생성, 해독, 대사'],gb:['담낭 (Gallbladder)','담즙을 농축·저장'],duo:['십이지장 (Duodenum)','총담관과 췌관이 열리는 곳 (Vater 팽대부)'],panc:['췌장 (Pancreas)','소화효소와 insulin 분비'],pduct:['췌관 (Pancreatic duct)','췌액을 십이지장으로'],
-  cha:['총간동맥 (Common hepatic a.)','복강동맥에서 간으로'],celiac:['복강동맥 (Celiac trunk)','간·위·비장 동맥의 뿌리'],smv:['상장간막정맥 (SMV)','간문맥으로 합류'],splv:['비정맥 (Splenic v.)','간문맥으로 합류'],stomach:['위 (Stomach)','주변 장기'],ivc:['하대정맥 (IVC)','간정맥이 합류'],
-  pvn:['간문맥 (Portal vein) · 도식','장·비장의 혈액을 간으로 (메시 없음, 도식)'],bile:['담도 (Biliary tree) · 도식','간관 → 총담관 → 십이지장. 담낭관이 합류 (메시 없음, 도식)']};
-const COL={liver:0x8e3b32,gb:0x4f9a52,duo:0xd9a38a,panc:0xe3c27a,pduct:0xf0e0a0,cha:0xe0483c,celiac:0xe0483c,smv:0x4a6fe0,splv:0x4a6fe0,stomach:0xcf8f86,ivc:0x3c60c8};
-const picks=[],ctxM=[];let liverM;
-Object.keys(H.parts).forEach(n=>{const tr=n==='liver'||n==='stomach';const m=new THREE.Mesh(geo(n),new THREE.MeshStandardMaterial({color:COL[n],roughness:.5,transparent:tr,opacity:n==='stomach'?.35:1,depthWrite:!tr,side:THREE.DoubleSide}));
-  m.userData.k=n;m.renderOrder=tr?5:2;scene.add(m);picks.push(m);if(n==='liver')liverM=m;if(n==='stomach'||n==='duo'||n==='panc')ctxM.push(m);});
-// 메시가 없는 구조는 도식 튜브로 (위치는 추정값. 다음 단계에서 해부 랜드마크로 보정)
-const tube=(pts,r,col,key)=>{const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p=>new V3(p[0],p[1],p[2]))),40,r,10,false),new THREE.MeshStandardMaterial({color:col,roughness:.35}));m.userData.k=key;m.renderOrder=3;scene.add(m);picks.push(m);return m;};
-const hil=[-.3,-.5,.35],conf=[.3,-1.05,.3],amp=[-.8,-1.62,.0];
-tube([conf,[.05,-.8,.3],hil,[-.75,-.2,.3]],.09,0x5b6fe6,'pvn');tube([hil,[-.1,-.25,.1],[.6,.0,.2]],.07,0x5b6fe6,'pvn');
-tube([[-.9,-.15,.35],hil,[-.45,-.95,.3],[-.7,-1.35,.15],amp],.05,0x58b86a,'bile');tube([[.5,-.1,.3],[-.05,-.35,.35],hil],.045,0x58b86a,'bile');
-{const g=H.info.gb,neck=[g.max[0],g.max[1],g.min[2]+.2];tube([neck,[-.52,-.62,.4],[-.42,-.8,.33]],.035,0x58b86a,'bile');}
-const call=$('call'),ray=new THREE.Raycaster(),nd=new THREE.Vector2();let sel=null,down=null;
-$('gl').addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
-$('gl').addEventListener('pointerup',e=>{if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;const r=$('gl').getBoundingClientRect();nd.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(nd,camera);
-  let hs=ray.intersectObjects(picks.filter(m=>m.visible),false);if(!hs.length){sel=null;call.style.display='none';return;}
-  let h=hs[0];if(h.object===liverM&&liverM.material.opacity<.6){const inn=hs.find(x=>x.object!==liverM&&x.object.userData.k!=='stomach');if(inn)h=inn;}
-  const n=NAME[h.object.userData.k];sel=h.point.clone();call.firstChild.textContent=n[0];call.lastChild.textContent=n[1];call.style.display='block';});
-$('op').addEventListener('input',()=>{const o=Math.max(.05,1-$('op').value/100);liverM.material.opacity=o;liverM.material.depthWrite=o>.98;});$('op').dispatchEvent(new Event('input'));
-$('ctx').addEventListener('change',e=>ctxM.forEach(m=>{m.visible=e.target.checked;}));
-$('reset').addEventListener('click',()=>{camera.position.copy(POS0);controls.target.copy(TARGET);fit();});
-function fit(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();const t=Math.tan(camera.fov*Math.PI/360),d=Math.max(3.2/t,3.4/(t*camera.aspect));camera.position.sub(controls.target).setLength(d).add(controls.target);}
-addEventListener('resize',fit);fit();
-const tmp=new V3();(function loop(){requestAnimationFrame(loop);controls.update();if(sel){tmp.copy(sel).project(camera);call.style.transform='translate3d('+Math.min(innerWidth-210,Math.max(8,(tmp.x+1)/2*innerWidth+14))+'px,'+((1-tmp.y)/2*innerHeight-20)+'px,0)';}renderer.render(scene,camera);})();
-})();
-</script>
+<script src="cases.js"></script>
+<script src="explain.js"></script>
+<script src="hepato.js"></script>
 </body>
 </html>
