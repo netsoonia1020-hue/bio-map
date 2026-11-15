@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 5';
+const VER='Ver.cardio 6';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -141,7 +141,7 @@ vec3 hdeform(vec3 p,vec4 w,vec3 n){
   return p+d;
 }`;
 const FS_DECL=`
-uniform vec3 uOrg[4];uniform float uWave[4];uniform float uPlat[4];uniform float uChaos[4];uniform float uT;uniform float uOp;uniform vec4 uHi;uniform vec4 uIsc;uniform float uDbg;uniform float uGlow;uniform vec4 uDye;uniform float uStop;uniform vec4 uJo;uniform vec3 uTint;uniform float uDig;uniform float uFlu;uniform float uPulse;uniform float uCorF;uniform vec4 uHi2;
+uniform vec3 uOrg[4];uniform float uWave[4];uniform float uPlat[4];uniform float uChaos[4];uniform float uT;uniform float uOp;uniform vec4 uHi;uniform vec4 uIsc;uniform float uDbg;uniform float uGlow;uniform vec4 uDye;uniform float uStop;uniform vec4 uJo;uniform vec3 uTint;uniform float uDig;uniform float uFlu;uniform float uPulse;uniform float uCorF;uniform vec4 uHi2;uniform float uVes;
 varying vec3 vP;varying vec4 vW;`;
 const FS_BODY=`#include <emissivemap_fragment>
 {
@@ -152,6 +152,8 @@ const FS_BODY=`#include <emissivemap_fragment>
     ch+=w*uChaos[k];}
   float cn=smoothstep(.2,.7,sin(vP.x*9.+uT*23.)*sin(vP.y*8.-uT*17.)+.6*sin(vP.z*11.+uT*29.)*sin(vP.y*5.+uT*13.));
   float fres=pow(1.-abs(dot(normalize(normal),normalize(vViewPosition))),2.2);
+  float ndv=clamp(abs(dot(normalize(normal),normalize(vViewPosition))),0.,1.);
+  if(uVes>.5){diffuseColor.rgb*=mix(.42,1.22,pow(ndv,.75));totalEmissiveRadiance+=vec3(1.,.95,.9)*(pow(ndv,26.)*.2+pow(ndv,4.)*.05);}
   float di=distance(vP,uIsc.xyz);
   float isc=uIsc.w>0.?1.-smoothstep(uIsc.w*.55,uIsc.w,di):0.;
   float ws=vW.x+vW.y+vW.z+vW.w,wv=vW.x+vW.y;
@@ -180,7 +182,7 @@ const FS_BODY=`#include <emissivemap_fragment>
   if(uDbg>.5){diffuseColor.rgb=vW.xyz+vW.w*vec3(1.,1.,0.);diffuseColor.a=1.;}
 }`;
 function inject(mat,opt){
-  opt=opt||{};const own={uOp:opt.op||{value:1},uEndo:{value:opt.endo?1:0},uDye:{value:new THREE.Vector4()},uStop:{value:99},uJo:{value:new THREE.Vector4(0,0,0,-1)},uTint:{value:new V3(mat.color.r,mat.color.g,mat.color.b)},uCorF:{value:opt.cor?1:0}};
+  opt=opt||{};const own={uOp:opt.op||{value:1},uEndo:{value:opt.endo?1:0},uDye:{value:new THREE.Vector4()},uStop:{value:99},uJo:{value:new THREE.Vector4(0,0,0,-1)},uTint:{value:new V3(mat.color.r,mat.color.g,mat.color.b)},uCorF:{value:opt.cor?1:0},uVes:{value:opt.ves?1:0}};
   if(opt.valve)Object.assign(own,{uVc:{value:opt.valve.c},uVu:{value:opt.valve.u},uVo:opt.valve.o,uVm:{value:opt.valve.m}});
   mat.userData.own=own;
   mat.onBeforeCompile=sh=>{
@@ -231,19 +233,19 @@ const wallB=addMesh(gWall,mWB,null,5),wallF=addMesh(gWall,mWF,'wall',7);
 // 내부 구조
 const vOpen={mv:{value:1},tv:{value:1},pv:{value:0}};
 const inner=[];
-inner.push(addMesh(partGeo('pap'),inject(std(0xa9675a,{clip:false,rough:.75,env:.15})),'pap',2));
-inner.push(addMesh(partGeo('mv'),inject(std(0x9f857b,{clip:false,rough:.8,env:.12}),{valve:{c:MVc,u:uLV,o:vOpen.mv,m:0}}),'mv',2));
-inner.push(addMesh(partGeo('tv'),inject(std(0x9f857b,{clip:false,rough:.8,env:.12}),{valve:{c:TVc,u:uRV,o:vOpen.tv,m:0}}),'tv',2));
-inner.push(addMesh(partGeo('pv'),inject(std(0x9f857b,{clip:false,rough:.8,env:.12}),{valve:{c:PVc,u:nPv,o:vOpen.pv,m:1}}),'pv',2));
+inner.push(addMesh(partGeo('pap'),inject(std(0xa9675a,{rough:.75,env:.15})),'pap',2));
+inner.push(addMesh(partGeo('mv'),inject(std(0x9f857b,{rough:.8,env:.12}),{valve:{c:MVc,u:uLV,o:vOpen.mv,m:0}}),'mv',2));
+inner.push(addMesh(partGeo('tv'),inject(std(0x9f857b,{rough:.8,env:.12}),{valve:{c:TVc,u:uRV,o:vOpen.tv,m:0}}),'tv',2));
+inner.push(addMesh(partGeo('pv'),inject(std(0x9f857b,{rough:.8,env:.12}),{valve:{c:PVc,u:nPv,o:vOpen.pv,m:1}}),'pv',2));
 // 관상동맥·정맥
 const corMats={};
-const cors=['rca','lad','lcx'].map(k=>{corMats[k]=inject(std(0xff7d5e,{rough:.35,env:.8,trans:true}),{cor:1});corMats[k].depthWrite=true;return addMesh(partGeo(k),corMats[k],k,3);});
-cors.push(addMesh(partGeo('cvn'),inject(std(0x4d7bd6,{rough:.35,env:.8})),'cvn',3));
+const cors=['rca','lad','lcx'].map(k=>{corMats[k]=inject(std(0xff7d5e,{rough:.22,env:1.1,trans:true}),{cor:1,ves:1});corMats[k].depthWrite=true;return addMesh(partGeo(k),corMats[k],k,3);});
+cors.push(addMesh(partGeo('cvn'),inject(std(0x4d7bd6,{rough:.22,env:1.1}),{ves:1}),'cvn',3));
 // 대혈관
 const vessels=[['ao',0xd9453c],['pa',0x4a6fe0],['pvn',0xe3695f],['svc',0x3c60c8],['ivc',0x3c60c8]].map(([k,c])=>{
-  const m=inject(std(c,{trans:true}),{op:opVes});transMats.push([m,opVes]);return addMesh(partGeo(k,true),m,k,6);});
+  const m=inject(std(c,{trans:true,rough:.3,env:.9}),{op:opVes,ves:1});transMats.push([m,opVes]);return addMesh(partGeo(k,true),m,k,6);});
 // 대동맥판(메시 없음): 절차적 판엽
-const valveMat=new THREE.MeshStandardMaterial({color:0x9f857b,roughness:.8,side:THREE.DoubleSide,envMap:envTex,envMapIntensity:.4});
+const valveMat=new THREE.MeshStandardMaterial({clippingPlanes:[clip],color:0x9f857b,roughness:.8,side:THREE.DoubleSide,envMap:envTex,envMapIntensity:.4});
 const aoValve=(function(pos,dir,r,n){
   const g=new THREE.Group();g.position.copy(pos);g.quaternion.setFromUnitVectors(new V3(0,0,1),dir.clone().normalize());heart.add(g);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.02,8,36),valveMat);ring.userData.pick='av';g.add(ring);pickables.push(ring);
@@ -266,7 +268,7 @@ const ringG=new THREE.TorusGeometry(.12,.012,8,28),ringM=new THREE.MeshBasicMate
 const CD=HM.land.C,cond=[],condRoots=[];
 function condPath(key,pts,r){
   const curve=new THREE.CatmullRomCurve3(pts.map(v3)),g=addW(new THREE.TubeGeometry(curve,pts.length*7,r,7,false));
-  const mat=inject(new THREE.MeshBasicMaterial({color:0x6b5c1e}),{lit:false,endo:1});
+  const mat=inject(new THREE.MeshBasicMaterial({color:0x6b5c1e,clippingPlanes:[clip]}),{lit:false,endo:1});
   const m=new THREE.Mesh(g,mat);m.renderOrder=3;m.frustumCulled=false;m.userData.pick=key;heart.add(m);pickables.push(m);
   const dot=new THREE.Mesh(dotG,dotM);dot.visible=false;dot.renderOrder=9;heart.add(dot);condRoots.push(m,dot);
   const o={key,curve,mat,dot,lit:0};cond.push(o);return o;
@@ -304,7 +306,7 @@ const lGeo=new THREE.BufferGeometry();lGeo.setAttribute('position',new THREE.Buf
 const spr=document.createElement('canvas');spr.width=spr.height=64;{const x=spr.getContext('2d'),g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.25,'rgba(255,255,255,.7)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);}
 const heads=new THREE.Points(hGeo,new THREE.PointsMaterial({size:.085,map:new THREE.CanvasTexture(spr),vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:true}));
 const tails=new THREE.LineSegments(lGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
-heads.renderOrder=8;tails.renderOrder=8;heads.frustumCulled=tails.frustumCulled=false;heart.add(heads,tails);
+heads.material.clippingPlanes=[clip];tails.material.clippingPlanes=[clip];heads.renderOrder=8;tails.renderOrder=8;heads.frustumCulled=tails.frustumCulled=false;heart.add(heads,tails);
 const tmp=new V3();let perf=1,perfT=1,pInit=false;
 function stepParticles(dt,S){
   for(let i=0;i<NP;i++){
@@ -370,8 +372,20 @@ function trace(b,x0,y0,w,win,k,color,lw){
     const x=x0+((j/FS)%win)/win*w,y=y0-v*k;if(pen&&x>=px)ex.lineTo(x,y);else{ex.moveTo(x,y);pen=true;}px=x;}
   ex.stroke();
 }
-let gridC=null;
+let gridC=null,zoomL=-1;
+ecgC.style.cursor='pointer';
+ecgC.addEventListener('click',e=>{if(zoomL>=0){zoomL=-1;return;}const r=ecgC.getBoundingClientRect(),c=Math.min(3,Math.floor((e.clientX-r.left)/r.width*4)),w=Math.min(2,Math.floor((e.clientY-r.top)/r.height*3));zoomL=[[0,1,2],[3,4,5],[6,7,8],[9,10,11]][c][w];});
+function drawZoom(){
+  ex=ecgCtx;ex.setTransform(dpr,0,0,dpr,0,0);ex.fillStyle='#04080d';ex.fillRect(0,0,eW,eH);ex.lineJoin='round';
+  const win=eW<520?4.5:7,pps=eW/win,k=Math.min(eH/3.3,.8*pps),base=eH*.58,gain=k/(.4*pps);
+  ex.lineWidth=1;for(let s=0;s*.2<=win;s++){const x=Math.round(s*.2*pps)+.5;ex.strokeStyle=s%5===0?'rgba(255,110,120,.22)':'rgba(255,110,120,.09)';ex.beginPath();ex.moveTo(x,0);ex.lineTo(x,eH);ex.stroke();}
+  for(let m=-6;m<=6;m++){const y=Math.round(base-m*.5*k)+.5;if(y<0||y>eH)continue;ex.strokeStyle=m%2===0?'rgba(255,110,120,.22)':'rgba(255,110,120,.09)';ex.beginPath();ex.moveTo(0,y);ex.lineTo(eW,y);ex.stroke();}
+  trace(buf[zoomL],0,base,eW,win,k,'#7cf5a6',2.2);
+  ex.fillStyle='#d6f5e2';ex.font='600 18px "IBM Plex Mono",monospace';ex.fillText(LEADS[zoomL],10,24);
+  ex.fillStyle='#8fa3b5';ex.font='11px "IBM Plex Mono",monospace';ex.fillText((10*gain).toFixed(0)+' mm/mV · 25 mm/s · 눈금 0.2초 / 0.5 mV · 탭하면 12유도로',10,eH-8);
+}
 function drawMon(){
+  if(zoomL>=0){drawZoom();return;}
   ex=ecgCtx;ex.setTransform(dpr,0,0,dpr,0,0);ex.fillStyle='#04080d';ex.fillRect(0,0,eW,eH);ex.lineJoin='round';
   const cols=4,rows=3,cw=eW/cols,ch=eH/rows,win=2.5,mm=Math.max(2,cw/win*.2/5),k=Math.min(10*mm,ch/3.3);
   if(!gridC||gridC.width!==ecgC.width||gridC.height!==ecgC.height){gridC=document.createElement('canvas');gridC.width=ecgC.width;gridC.height=ecgC.height;const g=gridC.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle='#04080d';g.fillRect(0,0,eW,eH);g.lineWidth=1;
@@ -464,8 +478,9 @@ function applyLayers(){
   blkL.visible=(ly.cond&&vm!=='flow')&&!!f.lbb;blkR.visible=(ly.cond&&vm!=='flow')&&!!f.rbb;flLoop.visible=(ly.cond&&vm!=='flow')&&!!f.flutter;avLoop.visible=(ly.cond&&vm!=='flow')&&!!f.avnrt;focL.visible=focR.visible=false;
   cors.forEach(m=>{m.visible=ly.cor;});occLAD.visible=ly.cor&&f.infarct==='ant'&&!proc.reperf;occRCA.visible=ly.cor&&f.infarct==='inf'&&!proc.reperf;netL.visible=netR.visible=(ly.cond&&vm!=='flow');
   vessels.forEach(m=>{m.visible=ly.ves;});inner.forEach(m=>{m.visible=ly.val;});
+  if(SU.uFlu.value>.5){inner.forEach(m=>{m.visible=false;});cors[3].visible=false;condRoots.forEach(m=>{m.visible=false;});netL.visible=netR.visible=false;heads.visible=tails.visible=false;}
 }
-function setOpacity(){const tr=+$('op').value;$('opO').textContent=tr+'%';const o=Math.max(.03,1-tr/100);opWall.value=opVes.value=o;transMats.forEach(([m])=>{m.depthWrite=o>.985;});}
+function setOpacity(){const tr=+$('op').value;$('opO').textContent=tr+'%';const o=Math.max(.03,1-tr/100);opWall.value=o;opVes.value=Math.max(o,.5);transMats.forEach(([m])=>{m.depthWrite=o>.985;});}
 $('op').addEventListener('input',setOpacity);
 function setCut(){const v=+$('cut').value;$('cutO').textContent=v?v+'%':'끔';clip.constant=v?1.45-v/100*2.6:9;}
 $('cut').addEventListener('input',setCut);
@@ -988,7 +1003,7 @@ const X=HM.land.X,NET=HM.land.net;
 function mkNet(polys){
   const pos=[];polys.forEach(p=>{for(let i=0;i+1<p.length;i++)pos.push(p[i][0],p[i][1],p[i][2],p[i+1][0],p[i+1][1],p[i+1][2]);});
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(new Float32Array(pos.length),3));addW(g);
-  const m=new THREE.LineSegments(g,inject(new THREE.LineBasicMaterial({color:0x6b5c1e}),{lit:false,endo:1}));m.renderOrder=3;m.frustumCulled=false;heart.add(m);return m;
+  const m=new THREE.LineSegments(g,inject(new THREE.LineBasicMaterial({color:0x6b5c1e,clippingPlanes:[clip]}),{lit:false,endo:1}));m.renderOrder=3;m.frustumCulled=false;heart.add(m);return m;
 }
 const netL=mkNet(NET.L),netR=mkNet(NET.R);
 // 판막 개폐 표시 고리
@@ -1001,13 +1016,15 @@ let ejT=[-9,-9],ejPrev=[false,false];
 
 // 위험 부위 표지 (HTML 칩)
 const tagBox=$('tags');let tags=[];
-function setTags(list){tagBox.innerHTML='';tags=list.map(([p,txt,cls])=>{const el=document.createElement('div');el.className='tag'+(cls?' '+cls:'');el.innerHTML='<b></b><small>눌러서 해설 보기</small>';el.firstChild.textContent=txt;el.addEventListener('click',()=>openExpl('m'));tagBox.appendChild(el);return{el,p:Array.isArray(p)?v3(p):p.clone()};});}
+function setTags(list){tagBox.innerHTML='';tags=list.map(([p,txt,cls])=>{const el=document.createElement('div');el.className='tag'+(cls?' '+cls:'');el.innerHTML='<b></b><small>눌러서 해설 보기</small>';el.firstChild.textContent=txt;el.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();openExpl('m');});tagBox.appendChild(el);return{el,p:Array.isArray(p)?v3(p):p.clone()};});}
 const mid=(a,b)=>v3(a).add(v3(b)).multiplyScalar(.5);
 const vsdP=mid(LD.lvSept,LD.rvSept),iaP=LAc.clone().add(RAc).multiplyScalar(.5);iaP.addScaledVector(nia,-(iaP.clone().sub(cia).dot(nia)));
 const aoL=X.aoL.map(v3);let iArch=0;aoL.forEach((p,i)=>{if(p.y>aoL[iArch].y)iArch=i;});const iDuct=Math.min(aoL.length-2,iArch+3);
 const bifP=v3(LD.bif),ductP=aoL[iDuct].clone().lerp(bifP,.5);
 function tagsFor(sc){
   const f=sc.flags||{},o=[];
+  if(proc.reperf&&f.infarct){const an=f.infarct==='ant';return[[an?LD.ladOcc:LD.rcaOcc,'스텐트 · 재관류 (TIMI 3)','ok'],[an?LD.iscAnt:LD.iscInf,'회복 중인 심근 · stunned myocardium','ok']];}
+  if(proc.reperf&&f.isch)return[[LD.ladOcc,'스텐트 · 협착 해소','ok']];
   if(f.infarct==='ant'&&!proc.reperf)o.push([LD.ladOcc,'LAD 폐색 · culprit lesion'],[LD.iscAnt,'허혈 심근 · ischemic myocardium']);
   if(f.infarct==='inf'&&!proc.reperf)o.push([LD.rcaOcc,'RCA 폐색 · culprit lesion'],[LD.iscInf,'허혈 심근 · ischemic myocardium']);
   if(f.lbb)o.push([CD.lbb[0][1],'LBB 전도 차단']);if(f.rbb)o.push([CD.rbb[0][2],'RBB 전도 차단']);
