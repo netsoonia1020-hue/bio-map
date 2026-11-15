@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>응급실 리듬별 3D 심장 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: full-bleed 3D stage with floating glass controls; one tabbed chart card on the right; monitor dock below the stage. Single dark theme by choice (bedside monitor world). */
+  --bg:#060b12; --glass:rgba(13,22,33,.72); --solid:#0d1621; --raise:#142233; --line:rgba(120,190,220,.16); --line2:rgba(120,190,220,.32);
+  --ink:#e6eef5; --dim:#8fa3b5; --accent:#57d3e6;
+  --ecg:#6ff09a; --abp:#ff6b72; --spo2:#62d6ff; --resp:#f4d35e;
+  --ok:#4fd08a; --warn:#f2b84b; --crit:#ff5d66;
+  --body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+  --pop:rgba(10,18,28,.95);
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#eef3f7; --glass:rgba(255,255,255,.8); --solid:#ffffff; --raise:#e3edf4; --line:rgba(20,60,90,.16); --line2:rgba(20,60,90,.34);
+  --ink:#12202c; --dim:#52677a; --accent:#0a7f96; --ok:#17884f; --warn:#a86a00; --crit:#d32a3c; --pop:rgba(255,255,255,.97);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 348px;height:100%;min-height:620px}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.view{position:relative;flex:1;min-height:300px;overflow:hidden}
+.view canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.top{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between;pointer-events:none}
+.top>*{pointer-events:auto}
+.picker{display:flex;align-items:stretch;min-width:0}
+.picker button{background:transparent;border:0;padding:8px 10px}
+.picker .nav{color:var(--dim);font-size:15px}
+.picker .nav:hover{color:var(--accent)}
+#pick{display:flex;align-items:center;gap:9px;min-width:0;border-left:1px solid var(--line);border-right:1px solid var(--line);padding:6px 12px}
+#pick .t{display:flex;flex-direction:column;align-items:flex-start;min-width:0;line-height:1.25}
+#pick .t small{font-size:10.5px;color:var(--dim);letter-spacing:.04em}
+#pick .t b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+#pick .car{color:var(--dim);font-size:10px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sev,var(--dim));box-shadow:0 0 8px var(--sev,transparent);flex:none}
+.seg{display:inline-flex;padding:3px;gap:2px}
+.seg button{background:transparent;border:0;border-radius:7px;padding:5px 10px;font-size:12px;color:var(--dim);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--raise);color:var(--accent);box-shadow:inset 0 0 0 1px var(--line2)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.pop{position:absolute;z-index:5;left:12px;top:64px;width:min(680px,calc(100% - 24px));max-height:calc(100% - 80px);overflow:auto;padding:12px 14px 14px;display:none;background:var(--pop)}
+.pop.on{display:block}
+.pop h3{font-size:10.5px;font-weight:500;color:var(--accent);letter-spacing:.08em;margin:10px 0 6px}
+.pop h3:first-child{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:6px}
+.sc{display:flex;align-items:center;gap:8px;text-align:left;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:0}
+.sc:hover{border-color:var(--line2);background:var(--raise)}
+.sc[aria-pressed="true"]{border-color:var(--accent);background:var(--raise)}
+.sc span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc small{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.sc em{font-style:normal;font-size:9.5px;color:var(--accent);border:1px solid var(--line2);border-radius:4px;padding:0 4px}
+.hud{position:absolute;left:14px;top:66px;display:flex;flex-direction:column;gap:1px;pointer-events:none;font-size:12px;color:var(--dim);max-width:70%}
+.hud i{font-style:normal;color:var(--ink)}
+.hud .k{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.08em;color:var(--accent);margin-right:6px}
+.hint{position:absolute;right:14px;top:66px;font-size:11px;color:var(--dim);pointer-events:none;text-align:right}
+.call{position:absolute;left:0;top:0;will-change:transform;z-index:4;transform:translate(16px,-50%);padding:7px 11px;max-width:240px;pointer-events:none;display:none;border-color:var(--line2)}
+.call::before{content:"";position:absolute;left:-15px;top:50%;width:14px;height:1px;background:var(--accent)}
+.call::after{content:"";position:absolute;left:-19px;top:calc(50% - 3px);width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.call b{display:block;font-size:13px}
+.call span{font-size:11.5px;color:var(--dim)}
+.bar{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:center;pointer-events:none}
+.tools{pointer-events:auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;padding:7px 12px;max-width:100%}
+.tools label{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--dim);white-space:nowrap}
+.tools output{font-family:var(--mono);font-size:10.5px;color:var(--ink);min-width:30px}
+input[type=range]{width:104px;accent-color:var(--accent);height:16px}
+.ib{background:transparent;border:1px solid var(--line);border-radius:7px;padding:4px 10px;font-size:12px;color:var(--dim)}
+.ib[aria-pressed="true"],.ib[aria-expanded="true"]{color:var(--accent);border-color:var(--line2);background:var(--raise)}
+.layers{position:absolute;z-index:5;right:12px;bottom:66px;padding:10px 12px;display:none;flex-direction:column;gap:6px;background:var(--pop)}
+.layers.on{display:flex}
+.layers label{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.layers input{accent-color:var(--accent)}
+.legend{display:flex;gap:10px;font-size:10.5px;color:var(--dim);border-top:1px solid var(--line);padding-top:7px;margin-top:2px}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.dock{--ink:#e6eef5;--dim:#8fa3b5;--accent:#57d3e6;--raise:#142233;--line:rgba(120,190,220,.16);--line2:rgba(120,190,220,.32);color:var(--ink);flex:none;display:grid;grid-template-columns:minmax(0,1fr) 150px;grid-template-rows:auto minmax(0,1fr);height:300px;background:#04080d;border-top:1px solid var(--line)}
+.dhead{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 10px;border-bottom:1px solid var(--line)}
+.dhead .src{font-size:11px;color:var(--dim);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock canvas{width:100%;height:100%;min-height:0;display:block}
+.tiles{display:grid;min-height:0;grid-template-rows:repeat(4,minmax(0,1fr));border-left:1px solid var(--line)}
+.tile{padding:2px 10px;display:flex;flex-direction:column;justify-content:center;border-bottom:1px solid rgba(255,255,255,.04);min-height:0}
+.tile small{font-size:9.5px;letter-spacing:.06em;opacity:.8}
+.tile b{font-family:var(--mono);font-weight:500;font-size:23px;line-height:1.05;font-variant-numeric:tabular-nums}
+.t-hr{color:var(--ecg)}.t-bp{color:var(--abp)}.t-sp{color:var(--spo2)}.t-rr{color:var(--resp)}
+.t-bp b{font-size:18px}
+.side{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--line);background:var(--solid)}
+.shead{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.shead .brand{font-size:11px;color:var(--dim);letter-spacing:.04em;margin-bottom:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;padding:1px 9px;border-radius:999px;border:1px solid var(--sev);color:var(--sev)}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sev)}
+.shead h1{font-size:19px;margin:6px 0 0;font-weight:600;text-wrap:balance;line-height:1.3}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+.tabs button{background:transparent;border:0;border-bottom:2px solid transparent;padding:9px 4px;font-size:12.5px;color:var(--dim)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.pane{flex:1;overflow:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:14px}
+.pane h3{font-size:10.5px;font-weight:500;color:var(--accent);letter-spacing:.08em;margin:0 0 5px}
+.pane p,.pane ul{margin:0}
+.pane ul{padding-left:17px}
+.pane li{margin:3px 0}
+dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}
+dt{color:var(--dim)}dd{margin:0}
+.lab{display:grid;grid-template-columns:1fr auto auto;gap:0 12px;align-items:baseline}
+.lab>div{display:contents}
+.lab span{padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.lab .n{color:var(--dim)}
+.lab .v{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;font-size:14px}
+.lab .r{font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:right}
+.lab .hi .v,.lab .lo .v{color:var(--warn)}
+.lab .xx .v{color:var(--crit)}
+.lab .hi .v::after{content:" ↑"}.lab .lo .v::after{content:" ↓"}
+.lab .xx.hi .v::after{content:" ↑↑"}.lab .xx.lo .v::after{content:" ↓↓"}
+.note{font-size:11px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px}
+.srcbox{font-size:11.5px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.srcbox b{color:var(--ink);font-weight:500}
+.tag{position:absolute;left:0;top:0;will-change:transform;z-index:3;transform:translate(10px,-50%);font-size:11px;font-weight:500;padding:3px 9px;border-radius:7px;background:rgba(214,36,56,.92);color:#fff;white-space:nowrap;pointer-events:auto;cursor:pointer;box-shadow:0 0 0 1px rgba(255,255,255,.25),0 0 14px rgba(255,60,80,.55);animation:tg 1.4s ease-in-out infinite}
+.tag::before{content:"";position:absolute;left:-12px;top:calc(50% - 4px);width:8px;height:8px;border-radius:50%;background:#ff4458;box-shadow:0 0 10px #ff4458}
+@keyframes tg{50%{box-shadow:0 0 0 1px rgba(255,255,255,.25),0 0 4px rgba(255,60,80,.3)}}
+@media (prefers-reduced-motion:reduce){.tag{animation:none}}
+#procPop{left:auto;right:12px;bottom:66px;top:auto;width:min(360px,calc(100% - 24px))}
+#procPop .rowb{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+#procMsg{font-size:12px;min-height:34px;color:var(--ink)}
+#procPop label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);margin-bottom:6px}
+.app{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+.phase{position:absolute;left:12px;top:64px;display:flex;align-items:center;gap:10px;padding:7px 12px;pointer-events:none;font-size:14px;font-weight:600;max-width:calc(100% - 24px)}
+.phase .pd{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex:none}
+#phaseName{white-space:nowrap;min-width:9.5em}
+.pbar{width:90px;height:4px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden;flex:none}
+#pfill{display:block;height:100%;width:0;background:var(--accent)}
+.cap{position:absolute;z-index:4;left:50%;bottom:70px;transform:translateX(-50%);padding:7px 14px;font-size:13px;display:none;max-width:min(680px,calc(100% - 24px));pointer-events:none;text-align:center}
+.cap.on{display:block}
+#expl{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);width:min(620px,calc(100% - 16px));padding:12px 14px 14px;display:none;background:var(--pop);max-height:calc(100% - 12px);overflow:auto}
+#expl.on{display:block}
+#expl .exh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+#exT{font-size:15px;font-weight:600}
+#exC{position:static;display:block;width:100%;height:auto;aspect-ratio:520/340;max-height:52vh;border-radius:8px;background:#04080d;cursor:pointer}
+#exD{font-size:13px;line-height:1.6;margin:10px 0 8px}
+#exTopics{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+#exD ul{margin:0;padding-left:18px}
+.tag small{display:block;font-size:9.5px;font-weight:400;opacity:.9;line-height:1.2}
+.tag b{font-weight:600}
+.tag::after{content:"";position:absolute;left:-23px;top:calc(50% - 15px);width:26px;height:26px;border-radius:50%;border:2px solid #ff4458;animation:tr 1.5s ease-out infinite;pointer-events:none}
+@keyframes tr{from{transform:scale(.45);opacity:1}to{transform:scale(1.3);opacity:0}}
+#exTopics button[aria-pressed="true"]{color:var(--accent);border-color:var(--line2);background:var(--raise)}
+.dock #ecg{grid-column:1;grid-row:2;width:100%;height:100%}
+.dock #strip{grid-column:1;grid-row:3;width:100%;height:100%;border-top:1px solid var(--line)}
+.dock .tiles{grid-column:2;grid-row:2}
+.dock .dhead{grid-row:1}
+.dhead .ttl{font-size:11.5px;color:var(--ink);letter-spacing:.03em;font-weight:500}
+@media (max-width:980px){
+  html,body{height:auto}
+  .app{display:flex;flex-direction:column;height:auto;min-height:0}
+  .view{flex:none;height:66vh;min-height:440px}
+  .dock{height:270px;grid-template-columns:minmax(0,1fr) 92px;grid-template-rows:auto minmax(0,1fr)}
+  .phase{top:62px;font-size:13px;max-width:calc(100% - 24px)}
+  .tile b{font-size:18px}.t-bp b{font-size:14px}
+  .side{border-left:0;border-top:1px solid var(--line)}
+  .pane{overflow:visible}
+  .hint{display:none}
+  .hud{top:62px;font-size:11px;max-width:92%}
+  input[type=range]{width:74px}
+  .tools{gap:6px 10px;padding:6px 9px;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+  .tools>*{flex:none}
+  #pick{padding:6px 8px}
+  #pick .t b{max-width:36vw;font-size:14px}
+  .seg button{padding:5px 7px;font-size:11.5px}
+  .dhead .src{display:none}
+  .view{height:64svh}
+}
+@media (orientation:landscape) and (max-height:560px){
+  html,body{height:100%}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) min(300px,36vw);height:100dvh;min-height:0}
+  .main{min-height:0}
+  .view{flex:1;height:auto;min-height:0}
+  .dock{height:150px;grid-template-columns:minmax(0,1fr) 120px;grid-template-rows:auto minmax(0,1fr)}
+  .phase{top:52px;font-size:12.5px;padding:4px 10px}
+  .tiles{grid-template-rows:repeat(4,minmax(0,1fr));grid-template-columns:1fr}
+  .tile b{font-size:15px}.t-bp b{font-size:12px}
+  .side{border-top:0;border-left:1px solid var(--line);min-height:0}
+  .pane{overflow:auto}
+  .shead{padding:8px 12px 6px}.shead .brand{display:none}.shead h1{font-size:15px}
+  .hud{display:none}
+  .tools{padding:4px 8px;gap:4px 8px}
+  .tile small{font-size:8.5px;white-space:nowrap}
+  .layers,#procPop{bottom:48px}
+  .bar{bottom:6px}.top{top:6px}
+  .pop{top:52px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="main">
+    <div class="view" id="view">
+      <canvas id="gl"></canvas>
+      <div class="top">
+        <div class="picker glass">
+          <button type="button" class="nav" id="prev" aria-label="이전 리듬">‹</button>
+          <button type="button" id="pick" aria-haspopup="true" aria-expanded="false">
+            <i class="dot" id="pickDot"></i>
+            <span class="t"><small>리듬 선택</small><b id="pickName"></b></span>
+            <span class="car">▼</span>
+          </button>
+          <button type="button" class="nav" id="next" aria-label="다음 리듬">›</button>
+        </div>
+        <div class="seg glass" role="group" aria-label="파형 데이터" id="srcSeg">
+          <button type="button" data-v="real">PTB-XL 실측</button><button type="button" data-v="syn">합성</button>
+        </div>
+      </div>
+      <div class="pop glass" id="pop"></div>
+      <div class="phase glass" id="phase"><span class="pd"></span><b id="phaseName">준비 중</b><span class="pbar"><i id="pfill"></i></span></div><span id="hudE" hidden></span><span id="hudM" hidden></span>
+      <div class="hint">부위를 탭하면 이름 · 빨간 표지를 누르면 해설</div>
+      <div id="tags"></div>
+      <div class="pop glass" id="procPop">
+        <h3>관상동맥 시술 · Coronary intervention</h3>
+        <div class="rowb"><button type="button" class="ib" data-p="cag">CAG 조영</button><button type="button" class="ib" data-p="pci">PCI 스텐트</button><button type="button" class="ib" data-p="reset">초기화</button></div>
+        <label><input type="checkbox" id="flu" checked> 투시 화면 (fluoroscopy view)</label>
+        <div id="procMsg"></div>
+      </div>
+      <div class="pop glass" id="expl" role="dialog" aria-labelledby="exT"><div class="exh"><b id="exT"></b><button type="button" class="ib" id="exX">닫기</button></div><div id="exTopics"></div><canvas id="exC"></canvas><div id="exD"></div></div>
+      <div class="cap glass" id="procCap"></div>
+      <div class="call glass" id="call"><b></b><span></span></div>
+      <div class="layers glass" id="layers">
+        <label><input type="checkbox" id="lyFlow" checked> 혈류</label>
+        <label><input type="checkbox" id="lyCond" checked> 전도계</label>
+        <label><input type="checkbox" id="lyCor" checked> 관상동맥</label>
+        <label><input type="checkbox" id="lyVes" checked> 대혈관</label>
+        <label><input type="checkbox" id="lyVal" checked> 판막·건삭·유두근</label>
+        <label><input type="checkbox" id="lyAx"> 12유도 축 (lead axes)</label>
+        <label><input type="checkbox" id="lyGlow" checked> 발광 효과</label>
+        <div class="legend"><span><i style="background:#e6ff5a"></i>전기</span><span><i style="background:#ff5a4a"></i>동맥혈</span><span><i style="background:#5b8cff"></i>정맥혈</span></div>
+      </div>
+      <div class="bar">
+        <div class="tools glass">
+          <label for="op">투명도 <input id="op" type="range" min="0" max="100" value="72"><output id="opO">72%</output></label>
+          <label for="cut">단면 <input id="cut" type="range" min="0" max="100" value="0"><output id="cutO">끔</output></label>
+          <div class="seg" role="group" aria-label="재생 속도" id="spd" style="padding:0">
+            <button type="button" data-v="0.25">¼×</button><button type="button" data-v="0.5">½×</button><button type="button" data-v="1" aria-pressed="true">1×</button>
+          </div>
+          <div class="seg" role="group" aria-label="보기 모드" id="vmode" style="padding:0"><button type="button" data-v="all" aria-pressed="true">전체</button><button type="button" data-v="elec">전기</button><button type="button" data-v="flow">혈류</button></div>
+          <button type="button" class="ib" id="tPause" aria-pressed="false">일시정지</button>
+          <button type="button" class="ib" id="tLayers" aria-expanded="false">레이어</button>
+          <button type="button" class="ib" id="tDig" aria-pressed="false">Digital 3D</button>
+          <button type="button" class="ib" id="tProc" aria-expanded="false">시술</button>
+          
+        </div>
+      </div>
+    </div>
+    <div class="dock" id="dock">
+      <div class="dhead"><span class="ttl">12유도 심전도</span><span class="src" id="srcLine"></span></div>
+      <canvas id="ecg"></canvas>
+      <div class="tiles">
+        <div class="tile t-hr"><small>HR /min</small><b id="vHR">--</b></div>
+        <div class="tile t-bp"><small>ABP mmHg</small><b id="vBP">--</b></div>
+        <div class="tile t-sp"><small>SpO₂ %</small><b id="vSP">--</b></div>
+        <div class="tile t-rr"><small>RR /min</small><b id="vRR">--</b></div>
+      </div>
+    </div>
+  </main>
+  <aside class="side">
+    <div class="shead">
+      <div class="brand">응급실 리듬별 3D 심장 시뮬레이터 · 교육용</div>
+      <span class="pill" id="stPill"></span>
+      <h1 id="stName"></h1>
+    </div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button type="button" role="tab" data-v="st" aria-selected="true">상태</button>
+      <button type="button" role="tab" data-v="lab">검사</button>
+      <button type="button" role="tab" data-v="ecg">소견</button>
+      <button type="button" role="tab" data-v="er">처치</button>
+      <button type="button" role="tab" data-v="cav">주의</button>
+    </div>
+    <div class="pane" id="pane"></div>
+  </aside>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="heart-model.js"></script>
+<script src="ecg-data.js"></script>
+<script src="scenarios.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
