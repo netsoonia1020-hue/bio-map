@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 6';
+const VER='Ver.cardio 7';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -126,7 +126,7 @@ vec3 hdeform(vec3 p,vec4 w,vec3 n){
   for(int k=0;k<2;k++){
     float c=uC[k]*(1.-.7*isc);
     vec3 rel=p-uB[k];float s=dot(rel,uU[k]);vec3 rv=rel-s*uU[k];
-    float en=max(uEndo,smoothstep(-.35,.35,-dot(n,normalize(rv+vec3(1e-4)))));
+    float en=uEndo<0.?0.:max(uEndo,smoothstep(-.35,.35,-dot(n,normalize(rv+vec3(1e-4)))));
     float kr=mix(.06,.27,en);
     float a=.2*c*clamp(s/uL[k],0.,1.);
     vec3 r2=rv*(1.-kr*c);r2=r2*cos(a)+cross(uU[k],r2)*sin(a);
@@ -182,7 +182,7 @@ const FS_BODY=`#include <emissivemap_fragment>
   if(uDbg>.5){diffuseColor.rgb=vW.xyz+vW.w*vec3(1.,1.,0.);diffuseColor.a=1.;}
 }`;
 function inject(mat,opt){
-  opt=opt||{};const own={uOp:opt.op||{value:1},uEndo:{value:opt.endo?1:0},uDye:{value:new THREE.Vector4()},uStop:{value:99},uJo:{value:new THREE.Vector4(0,0,0,-1)},uTint:{value:new V3(mat.color.r,mat.color.g,mat.color.b)},uCorF:{value:opt.cor?1:0},uVes:{value:opt.ves?1:0}};
+  opt=opt||{};const own={uOp:opt.op||{value:1},uEndo:{value:opt.epi?-1:(opt.endo?1:0)},uDye:{value:new THREE.Vector4()},uStop:{value:99},uJo:{value:new THREE.Vector4(0,0,0,-1)},uTint:{value:new V3(mat.color.r,mat.color.g,mat.color.b)},uCorF:{value:opt.cor?1:0},uVes:{value:opt.ves?1:0}};
   if(opt.valve)Object.assign(own,{uVc:{value:opt.valve.c},uVu:{value:opt.valve.u},uVo:opt.valve.o,uVm:{value:opt.valve.m}});
   mat.userData.own=own;
   mat.onBeforeCompile=sh=>{
@@ -239,8 +239,8 @@ inner.push(addMesh(partGeo('tv'),inject(std(0x9f857b,{rough:.8,env:.12}),{valve:
 inner.push(addMesh(partGeo('pv'),inject(std(0x9f857b,{rough:.8,env:.12}),{valve:{c:PVc,u:nPv,o:vOpen.pv,m:1}}),'pv',2));
 // 관상동맥·정맥
 const corMats={};
-const cors=['rca','lad','lcx'].map(k=>{corMats[k]=inject(std(0xff7d5e,{rough:.22,env:1.1,trans:true}),{cor:1,ves:1});corMats[k].depthWrite=true;return addMesh(partGeo(k),corMats[k],k,3);});
-cors.push(addMesh(partGeo('cvn'),inject(std(0x4d7bd6,{rough:.22,env:1.1}),{ves:1}),'cvn',3));
+const cors=['rca','lad','lcx'].map(k=>{corMats[k]=inject(std(0xff7d5e,{rough:.22,env:1.1,trans:true}),{cor:1,ves:1,epi:1});corMats[k].depthWrite=true;return addMesh(partGeo(k),corMats[k],k,3);});
+cors.push(addMesh(partGeo('cvn'),inject(std(0x4d7bd6,{rough:.22,env:1.1}),{ves:1,epi:1}),'cvn',3));
 // 대혈관
 const vessels=[['ao',0xd9453c],['pa',0x4a6fe0],['pvn',0xe3695f],['svc',0x3c60c8],['ivc',0x3c60c8]].map(([k,c])=>{
   const m=inject(std(c,{trans:true,rough:.3,env:.9}),{op:opVes,ves:1});transMats.push([m,opVes]);return addMesh(partGeo(k,true),m,k,6);});
