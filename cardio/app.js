@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 21';
+const VER='Ver.cardio 22';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1319,7 +1319,7 @@ function echoRender(real){
   renderer.setScissorTest(true);renderer.setClearColor(0x04080d,1);
   renderer.setViewport(0,0,W,H);renderer.setScissor(0,0,W,H);renderer.clear();
   if(m){renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);}
-  orientOverlay(m?[m[0]+6,m[1]+(H<560?60:112),m[2]-12,m[3]-(H<560?110:180)]:(ECHO.tab==='3d'?rectOf($('e3D')):null));
+  orientOverlay(m?[m[0]+6,m[1]+(H<560?10:112),m[2]-12,m[3]-(H<560?70:180)]:(ECHO.tab==='3d'?rectOf($('e3D')):null));
   let s=rectOf(echoS);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(dScene,qCam);
   if(!m&&ECHO.tab==='3d'){const q=rectOf($('e3D'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
   if(ECHO.mm&&ECHO.tab==='mm'){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
@@ -1348,7 +1348,12 @@ function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eO
   c.fillStyle='#ffe678';c.beginPath();const mx=ox+Math.sin(ANG)*.3*sx+14;c.moveTo(mx,8);c.lineTo(mx+8,8);c.lineTo(mx+4,15);c.closePath();c.fill();
   {const {P,D,N,L}=EB,dd=new V3();c.font='600 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif';
    CHAM.forEach(ch=>{dd.copy(ch[1]).sub(P);if(Math.abs(dd.dot(N))>.45)return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.95||yd>DMAX*.95||yd<.3)return;
-     const t=ch[0].split(' ')[0],tw=c.measureText(t).width,x=ox+xl*sx-tw/2-5,y=yd*sy+5;c.fillStyle='rgba(4,8,13,.55)';rrect(c,x,y-13,tw+10,18,4);c.fill();c.fillStyle=ch[2];c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,x+5,y);});}
+     const t=ch[0].split(' ')[0],tw=c.measureText(t).width,x=ox+xl*sx-tw/2-5,y=yd*sy+5;c.fillStyle='rgba(4,8,13,.55)';rrect(c,x,y-13,tw+10,18,4);c.fill();c.fillStyle=ch[2];c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,x+5,y);});
+   c.font='500 '+(fs-1.5)+'px "IBM Plex Sans KR",sans-serif';c.strokeStyle='rgba(255,230,120,.85)';c.lineWidth=1.2;
+   estr().forEach(([t,p],k)=>{dd.copy(p).sub(P);if(Math.abs(dd.dot(N))>.3)return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.92||yd>DMAX*.92||yd<.35)return;
+     const px=ox+xl*sx,py=yd*sy,side=px<ox?-1:1,tw=c.measureText(t).width,lx=clamp(px+side*34,4,w-4),ly=clamp(py+(k%2?22:-20),30,h-30),bx=side<0?Math.max(4,lx-tw-8):Math.min(w-tw-12,lx);
+     c.beginPath();c.moveTo(lx,ly);c.lineTo(px,py);c.stroke();c.fillStyle='#ffe678';c.beginPath();c.arc(px,py,2.2,0,TAU);c.fill();
+     c.fillStyle='rgba(4,8,13,.6)';rrect(c,bx,ly-12,tw+8,17,4);c.fill();c.fillStyle='#ffe678';c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,bx+4,ly+1);});}
   lesionTargets().forEach(o=>{const th=Math.atan2(o.x,o.y),r=Math.hypot(o.x,o.y);if(Math.abs(th)>ANG||r>DMAX)return;const tx=ox+o.x*sx,ty=o.y*sy,side=tx<ox?-1:1,bx=clamp(tx+side*42,8,w-8),by=Math.max(40,ty-26);
     c.save();c.strokeStyle=o.col;c.fillStyle=o.col;c.lineWidth=2.4;c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=4;c.beginPath();c.moveTo(bx,by);c.lineTo(tx+side*6,ty-4);c.stroke();
     const ang=Math.atan2(ty-4-by,tx+side*6-bx);c.beginPath();c.moveTo(tx+side*2,ty-1);c.lineTo(tx+side*6-Math.cos(ang-.5)*11,ty-4-Math.sin(ang-.5)*11);c.lineTo(tx+side*6-Math.cos(ang+.5)*11,ty-4-Math.sin(ang+.5)*11);c.closePath();c.fill();c.restore();
@@ -1360,10 +1365,17 @@ function echoLayout(){const narrow=view.clientWidth<760,gap=6;
   $('eTab3').hidden=!narrow;[...$('eTabs').children].forEach(b=>b.setAttribute('aria-selected',b.dataset.v===ECHO.tab));
   const low={fn:$('eFunc'),mm:echoM,'3d':$('e3D')};if(!low[ECHO.tab])ECHO.tab='';Object.keys(low).forEach(k=>{low[k].style.display=k===ECHO.tab?'':'none';});
   $('eAdj').style.display=ECHO.adj?'':'none';$('eAdjB').setAttribute('aria-expanded',ECHO.adj);
-  let lowH=ECHO.tab==='fn'?$('eFunc').offsetHeight:ECHO.tab==='mm'?(narrow?170:200):ECHO.tab==='3d'?230:0;
-  if(ECHO.tab==='mm')echoM.style.height=lowH+'px';if(ECHO.tab==='3d')$('e3D').style.height=lowH+'px';
-  const fixed=$('eHead').offsetHeight+$('eTabs').offsetHeight+lowH+$('eTools').offsetHeight+gap*5,avail=echoP.clientHeight-fixed;
-  const sh=Math.max(140,Math.min(pw/(WD/DMAX),avail));echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';drawEchoOv();drawBull();}
+  const land=innerHeight<=560&&innerWidth>innerHeight&&!narrow;
+  if(land){const ratio=WD/DMAX,hh=$('eHead').offsetHeight,room=echoP.clientHeight-hh-8;if(ECHO.tab==='3d')ECHO.tab='';
+    if(ECHO.tab==='mm')echoM.style.height=Math.min(130,Math.max(90,room-$('eTabs').offsetHeight-$('eRec').offsetHeight-16))+'px';
+    let sh=Math.min(room,echoP.clientWidth*.56/ratio);sh=Math.max(100,sh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();return;}
+  const ratio=WD/DMAX,base=$('eHead').offsetHeight+$('eTabs').offsetHeight+$('eRec').offsetHeight+gap*5,room=echoP.clientHeight-base-2;
+  let sh,lowH=0;
+  if(ECHO.tab==='fn'){lowH=$('eFunc').offsetHeight;sh=Math.min(pw/ratio,room-lowH);}
+  else if(ECHO.tab==='mm'||ECHO.tab==='3d'){const minLow=ECHO.tab==='mm'?100:140,maxLow=ECHO.tab==='mm'?(narrow?170:210):900;sh=Math.min(pw/ratio,room*(ECHO.tab==='3d'?.5:.56));lowH=clamp(room-sh,minLow,maxLow);sh=Math.min(pw/ratio,room-lowH);
+    (ECHO.tab==='mm'?echoM:$('e3D')).style.height=lowH+'px';}
+  else sh=Math.min(pw/ratio,room);
+  sh=Math.max(90,sh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();}
 function setTab(t){if(t===ECHO.tab&&echoP.clientHeight<520)t='';ECHO.tab=t;ECHO.mm=t==='mm';if(t==='mm'){ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);}echoLayout();}
 const orient=new THREE.Group();orient.visible=false;heart.add(orient);
 {const CH=window.CHEST;if(CH){const g=n=>{const P=CH.parts[n],i16=new Int16Array(b64(P.p)),pos=new Float32Array(i16.length);for(let k=0;k<i16.length;k++)pos[k]=i16[k]/CH.q;
@@ -1371,6 +1383,10 @@ const orient=new THREE.Group();orient.visible=false;heart.add(orient);
   const bm=new THREE.MeshStandardMaterial({color:0xe9e2d0,roughness:.6,metalness:0,transparent:true,opacity:.3,depthWrite:false,envMap:envTex,envMapIntensity:.4});
   const cm=new THREE.MeshStandardMaterial({color:0xbcd8e6,roughness:.5,transparent:true,opacity:.28,depthWrite:false});
   const b1=new THREE.Mesh(g('bone'),bm),c1=new THREE.Mesh(g('cart'),cm);b1.renderOrder=2;c1.renderOrder=2;orient.add(b1,c1);}}
+let ESTR=null;function estr(){if(ESTR)return ESTR;const pp=inner[0].geometry.attributes.position,aw=inner[0].geometry.attributes.aW,e2=v3(LD.e2l);let A=new V3(),B=new V3(),na=0,nb=0;
+  for(let i=0;i<pp.count;i++){if(aw.getX(i)<.5)continue;const p=new V3(pp.getX(i),pp.getY(i),pp.getZ(i));if(p.clone().sub(MVc).dot(e2)>0){A.add(p);na++;}else{B.add(p);nb++;}}
+  ESTR=[['RVOT',PVc.clone().addScaledVector(nPv,-.45)],['PA 폐동맥',PVc.clone().addScaledVector(nPv,.55)],['AV 대동맥판',AOc.clone()],['MV 승모판',MVc.clone().addScaledVector(uLV,.12)],['TV 삼첨판',TVc.clone().addScaledVector(uRV,.1)]];
+  if(na)ESTR.push(['유두근 (전외측)',A.divideScalar(na)]);if(nb)ESTR.push(['유두근 (후내측)',B.divideScalar(nb)]);return ESTR;}
 const CHAM=[['LV 좌심실',v3(LD.LVin),'#ff8a92'],['RV 우심실',v3(LD.RVin),'#8fb4ff'],['LA 좌심방',v3(LD.LAc),'#ffb0a8'],['RA 우심방',v3(LD.RAc),'#a9c8ff'],['Ao 대동맥',AOc.clone().addScaledVector(nAo,.5),'#ff9a9a']];
 CHAM.forEach(c=>{const s=textSprite(c[0].split(' ')[0],c[2],c[1],.26);s.material.depthTest=false;s.renderOrder=15;orient.add(s);});
 function textSprite(t,col,pos,h){const cv=document.createElement('canvas'),x=cv.getContext('2d');x.font='600 44px "IBM Plex Sans KR",sans-serif';const w=Math.ceil(x.measureText(t).width)+36;cv.width=w;cv.height=72;
@@ -1378,7 +1394,7 @@ function textSprite(t,col,pos,h){const cv=document.createElement('canvas'),x=cv.
   x.font='600 44px "IBM Plex Sans KR",sans-serif';x.fillStyle=col;x.textBaseline='middle';x.fillText(t,18,38);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));sp.scale.set(h*w/72,h,1);sp.position.copy(pos);sp.renderOrder=15;return sp;}
 const eOri=$('eOri'),eCmp=$('eCmp');
-function orientOverlay(r){if(!r){eOri.style.display='none';return;}const cr=glc.getBoundingClientRect(),vr=view.getBoundingClientRect();eOri.style.display='block';
+function orientOverlay(r){if(!r){eOri.style.display='none';return;}eOri.classList.toggle('tight',r[2]<300);const cr=glc.getBoundingClientRect(),vr=view.getBoundingClientRect();eOri.style.display='block';
   eOri.style.left=(cr.left-vr.left+r[0])+'px';eOri.style.top=(cr.top-vr.top+(cr.height-r[1]-r[3]))+'px';eOri.style.width=r[2]+'px';eOri.style.height=r[3]+'px';
   const v=EVIEWS.find(q=>q[0]===ECHO.view)||['','',''];$('eWinT').textContent=v[1]+' · '+(EWIN_TXT[ECHO.view]||'');
   const s=64;if(eCmp.width!==s*dpr){eCmp.width=s*dpr;eCmp.height=s*dpr;}const c=eCmp.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,s,s);
@@ -1387,7 +1403,7 @@ function orientOverlay(r){if(!r){eOri.style.display='none';return;}const cr=glc.
    .sort((p,q)=>p[0].z-q[0].z).forEach(([d,t,col])=>{const L=20,x=s/2+d.x*L,y=s/2-d.y*L,al=d.z<-.3?.45:1;c.globalAlpha=al;c.strokeStyle=col;c.lineWidth=2;c.beginPath();c.moveTo(s/2,s/2);c.lineTo(x,y);c.stroke();
      c.fillStyle=col;c.beginPath();c.arc(x,y,2.5,0,TAU);c.fill();c.font='600 9.5px "IBM Plex Sans KR",sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(t,s/2+d.x*(L+9),s/2-d.y*(L+9));c.globalAlpha=1;});}
 function setEcho(on){orient.visible=on;if(!on)orientOverlay(null);ECHO.on=on;$('tEcho').textContent=on?'초음파 닫기':'심초음파';if(!on){ECam=null;EBa=null;controls.enableDamping=true;}document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
-  if(on){if(innerHeight<520)ECHO.tab='';echoReset();viewBasis(ECHO.view);camSwing(EB);ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
+  if(on){ECHO.tab=innerHeight<520?'':(view.clientWidth<760?'3d':'fn');echoReset();viewBasis(ECHO.view);camSwing(EB);ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
   else{renderer.setScissorTest(false);sizeAll();resetView();}}
 $('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));
 $('eBack').addEventListener('click',()=>setEcho(false));
@@ -1402,7 +1418,7 @@ function drawDoppler(real){const w=echoS.clientWidth,h=echoS.clientHeight;if(!w)
   if(!ECHO.dop||!(ly.flow&&vm!=='elec'))return;
   const {P,D,N,L}=EB,sx=w/WD,sy=h/DMAX,ox=w/2,R=Math.max(3,w*.022);
   // Doppler colour box (ROI)
-  c.strokeStyle='rgba(255,255,255,.28)';c.lineWidth=1;c.setLineDash([4,4]);c.beginPath();const a0=-ANG*.75,a1=ANG*.75,r0=DMAX*.18,r1=DMAX*.92;
+  c.strokeStyle='rgba(120,220,255,.75)';c.lineWidth=1.5;c.setLineDash([]);c.beginPath();const a0=-ANG*.75,a1=ANG*.75,r0=DMAX*.18,r1=DMAX*.92;
   c.moveTo(ox+Math.sin(a0)*r0*sx,Math.cos(a0)*r0*sy);for(let k=0;k<=16;k++){const t=a0+(a1-a0)*k/16;c.lineTo(ox+Math.sin(t)*r0*sx,Math.cos(t)*r0*sy);}
   for(let k=16;k>=0;k--){const t=a0+(a1-a0)*k/16;c.lineTo(ox+Math.sin(t)*r1*sx,Math.cos(t)*r1*sy);}c.closePath();c.stroke();c.setLineDash([]);
   const GW=72,GH=Math.max(8,Math.round(GW*h/w));if(!dGrid||dGrid.w!==GW||dGrid.h!==GH){const cv=document.createElement('canvas');cv.width=GW;cv.height=GH;dGrid={w:GW,h:GH,cv,ctx:cv.getContext('2d'),sum:new Float32Array(GW*GH),n:new Float32Array(GW*GH)};}
@@ -1414,7 +1430,7 @@ function drawDoppler(real){const w=echoS.clientWidth,h=echoS.clientHeight;if(!w)
   const im=dGrid.ctx.createImageData(GW,GH),d=im.data;
   for(let k=0;k<GW*GH;k++){const n=dGrid.n[k];if(n<.6)continue;const v=dGrid.sum[k]/n,s=clamp(Math.abs(v)/2.4,0,1);if(s<.05)continue;const o=k*4;
     if(v>0){d[o]=150+105*s;d[o+1]=30+170*s*s;d[o+2]=20;}else{d[o]=20+40*s*s;d[o+1]=60+160*s*s;d[o+2]=170+85*s;}
-    d[o+3]=Math.round(255*clamp(.35+.5*s,0,.85)*clamp(n/2,0,1));}
+    d[o+3]=Math.round(255*clamp(.6+.4*s,0,.95)*clamp(n/1.5,0,1));}
   dGrid.ctx.putImageData(im,0,0);c.imageSmoothingEnabled=true;c.drawImage(dGrid.cv,0,0,w,h);
   // colour scale bar
   const bx=w-14,by=h*.32,bh=h*.32,gr=c.createLinearGradient(0,by,0,by+bh);gr.addColorStop(0,'#ffc814');gr.addColorStop(.25,'#c8281a');gr.addColorStop(.5,'#000');gr.addColorStop(.75,'#2c50d0');gr.addColorStop(1,'#3cd8ff');
@@ -1423,7 +1439,7 @@ function drawDoppler(real){const w=echoS.clientWidth,h=echoS.clientHeight;if(!w)
 EVIEWS.forEach(([k,ab,sh,nm])=>{const b=document.createElement('button');b.type='button';b.dataset.v=k;b.innerHTML='<b></b><small></small>';b.firstChild.textContent=ab;b.lastChild.textContent=sh;b.title=nm;b.setAttribute('aria-pressed',k===ECHO.view);
   b.addEventListener('click',()=>{ECHO.animNext=true;ECHO.view=k;ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(k);aimCursor();[...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x===b));});$('eView').appendChild(b);});
 $('eTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.v);});
-$('eAdjB').addEventListener('click',()=>{ECHO.adj=!ECHO.adj;echoLayout();});
+$('eAdjB').addEventListener('click',()=>{ECHO.adj=!ECHO.adj;echoLayout();requestAnimationFrame(echoLayout);});
 /* routine view per case + reset */
 const ECHO_DEF={nsr:['plax','기본 선별: 심실 크기·판막·벽 두께'],stach:['plax','빈맥 원인 선별: 수축력·심낭삼출'],af:['a4c','심방 크기·판막, 수축 불규칙'],afl:['a4c','심방 크기·판막'],svt:['plax','구조적 심질환 선별'],
   vt:['psax-pm','벽운동·경색 흉터 (VT 기질)'],tdp:['plax','전반 수축 평가'],sbrady:['plax','기본 평가'],junc:['plax','기본 평가'],avb1:['plax','기본 평가'],wb:['plax','기본 평가'],m2:['plax','기본 평가'],
@@ -1434,8 +1450,10 @@ const ECHO_DEF={nsr:['plax','기본 선별: 심실 크기·판막·벽 두께'],
 function echoReset(){const d=ECHO.def||['plax'];ECHO.animNext=!!EBcur&&ECHO.on;ECHO.view=d[0];ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(ECHO.view);aimCursor();ECHO.key='';
   [...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===ECHO.view));}
 function echoCase(sc){const d=ECHO_DEF[sc.id]||['plax','기본 평가'];ECHO.def=d;const v=EVIEWS.find(q=>q[0]===d[0]);$('eRec').textContent='루틴 단면 · '+v[3]+' — '+d[1];if(ECHO.on)echoReset();}
-$('eReset').addEventListener('click',echoReset);
-$('ePause').addEventListener('click',()=>$('tPause').click());$('eClose').addEventListener('click',()=>setEcho(false));new MutationObserver(()=>$('ePause').setAttribute('aria-pressed',$('tPause').getAttribute('aria-pressed'))).observe($('tPause'),{attributes:true});
+$('eReset').addEventListener('click',()=>{ECHO.animNext=true;ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(ECHO.view);aimCursor();ECHO.key='';});
+['eDop','eAdjB','eReset','eTilt','eRot'].forEach(id=>$(id).addEventListener('pointerdown',e=>e.stopPropagation()));
+$('eRec').addEventListener('click',()=>{$('eRec').classList.toggle('full');echoLayout();});
+$('ePause').addEventListener('click',()=>$('tPause').click());$('e3R').addEventListener('click',()=>{viewBasis(ECHO.view);camSwing(EB);});new MutationObserver(()=>$('ePause').setAttribute('aria-pressed',$('tPause').getAttribute('aria-pressed'))).observe($('tPause'),{attributes:true});
 /* LV function: EF / SV / CO, live LV volume, 17-segment wall motion */
 const EDV={hf:185,pedema:165,hcm:85,sbrady:135,chb:150,vsd:150,asd:130,avb1:125};
 const SEG_LAD=[1,2,7,8,13,14,17],SEG_RCA=[3,4,9,10,15],SEG_LCX=[5,6,11,12,16];
