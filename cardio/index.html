@@ -197,7 +197,7 @@ dt{color:var(--dim)}dd{margin:0}
 @media (min-width:981px){body.echo-on .dock{display:none}body.echo-on #echoP{bottom:12px}body.echo-on .bar{right:calc(min(54%,640px) + 24px)}}
 #echoS{position:relative;flex:none;cursor:crosshair}
 #echoM{position:relative;flex:none;width:100%;border:1px solid var(--line2);border-radius:10px;overflow:hidden}
-#echoOv,#echoEcg{position:absolute!important;inset:0;width:100%;height:100%;pointer-events:none}
+#eFlow,#echoOv,#echoEcg{position:absolute!important;inset:0;width:100%;height:100%;pointer-events:none}
 #echoEcg{top:auto!important;height:28%!important}
 .etools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;padding:5px 10px;font-size:11.5px;color:var(--dim)}
 .etools label{display:flex;gap:6px;align-items:center}
@@ -299,12 +299,12 @@ dt{color:var(--dim)}dd{margin:0}
       <div class="cap glass" id="procCap"></div>
       <div id="echoP" hidden>
         <div class="ehead glass" id="eHead"><button type="button" class="eback" id="eBack" aria-label="심초음파 닫고 3D 심장으로">‹ <span>3D 심장</span></button><div class="evs" id="eView" role="group" aria-label="초음파 단면"></div></div>
-        <div id="echoS"><canvas id="echoOv"></canvas></div>
+        <div id="echoS"><canvas id="eFlow"></canvas><canvas id="echoOv"></canvas></div>
         <div class="etabs" id="eTabs" role="tablist" aria-label="초음파 아래 화면"><button type="button" role="tab" data-v="fn" aria-selected="true">박출 · 벽운동</button><button type="button" role="tab" data-v="mm" aria-selected="false">M-mode</button><button type="button" role="tab" data-v="3d" aria-selected="false" id="eTab3">3D 심장</button></div>
         <div class="efunc glass" id="eFunc"><canvas id="eBull"></canvas><div class="efm"><div class="efrow"><div class="efbig"><b id="eEF">--</b><small>LVEF %</small></div><div class="efsm"><span>SV <b id="eSV">--</b> mL</span><span>CO <b id="eCO">--</b> L/min</span><span>EDV <b id="eEDV">--</b> mL</span></div></div><div class="efnote" id="eWM"></div><div class="evl">좌심실 용적 (mL)</div><canvas id="eVol"></canvas></div></div>
         <div id="echoM"><canvas id="echoEcg"></canvas></div>
         <div id="e3D"></div>
-        <div class="etools glass" id="eTools"><div class="erow"><button type="button" class="ib" id="eReset">단면 초기화</button><button type="button" class="ib" id="eAdjB" aria-expanded="false">각도 조절</button><span class="erec" id="eRec"></span></div>
+        <div class="etools glass" id="eTools"><div class="erow"><button type="button" class="ib" id="eReset">단면 초기화</button><button type="button" class="ib" id="eAdjB" aria-expanded="false">각도 조절</button><button type="button" class="ib" id="eDop" aria-pressed="true">컬러 도플러</button><span class="erec" id="eRec"></span></div>
           <div class="eadj" id="eAdj"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label><span class="ehint">단면을 탭하면 M-mode 커서 이동</span></div></div>
       </div>
       <div class="call glass" id="call"><b></b><span></span></div>
