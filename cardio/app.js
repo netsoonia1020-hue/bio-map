@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 27';
+const VER='Ver.cardio 28';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -240,9 +240,6 @@ const wallB=addMesh(gWall,mWB,null,5),wallF=addMesh(gWall,mWF,'wall',7);
 const vOpen={mv:{value:1},tv:{value:1},pv:{value:0}};
 const inner=[];
 inner.push(addMesh(partGeo('pap'),inject(std(0x7f4a42,{rough:.9,env:.04}),{lit:false}),'pap',2));
-inner.push(addMesh(partGeo('mv'),inject(std(0x7a655d,{rough:.9,env:.04}),{lit:false,valve:{c:MVc,u:uLV,o:vOpen.mv,m:0}}),'mv',2));
-inner.push(addMesh(partGeo('tv'),inject(std(0x7a655d,{rough:.9,env:.04}),{lit:false,valve:{c:TVc,u:uRV,o:vOpen.tv,m:0}}),'tv',2));
-inner.push(addMesh(partGeo('pv'),inject(std(0x7a655d,{rough:.9,env:.04}),{lit:false,valve:{c:PVc,u:nPv,o:vOpen.pv,m:1}}),'pv',2));
 // 관상동맥·정맥
 const corMats={};
 const cors=['rca','lad','lcx'].map(k=>{corMats[k]=inject(std(0xff7d5e,{rough:.22,env:1.1,trans:true}),{cor:1,ves:1,epi:1});corMats[k].depthWrite=true;return addMesh(partGeo(k),corMats[k],k,3);});
@@ -250,19 +247,86 @@ cors.push(addMesh(partGeo('cvn'),inject(std(0x4d7bd6,{rough:.22,env:1.1}),{ves:1
 // 대혈관
 const vessels=[['ao',0xd9453c],['pa',0x4a6fe0],['pvn',0xe3695f],['svc',0x3c60c8],['ivc',0x3c60c8]].map(([k,c])=>{
   const m=inject(std(c,{trans:true,rough:.3,env:.9}),{op:opVes,ves:1});transMats.push([m,opVes]);return addMesh(partGeo(k,true),m,k,6);});
-// 대동맥판(메시 없음): 절차적 판엽
-const valveMat=new THREE.MeshStandardMaterial({clippingPlanes:[clip],color:0x7a655d,roughness:.9,side:THREE.DoubleSide,envMap:envTex,envMapIntensity:.4});
-const aoValve=(function(pos,dir,r,n){
-  const g=new THREE.Group();g.position.copy(pos);g.quaternion.setFromUnitVectors(new V3(0,0,1),dir.clone().normalize());heart.add(g);
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(r,.02,8,36),valveMat);ring.userData.pick='av';g.add(ring);pickables.push(ring);
-  const leaves=[],h=Math.PI/n;
-  for(let i=0;i<n;i++){const o=new THREE.Group();o.position.set(r*Math.cos(i*2*h),r*Math.sin(i*2*h),0);o.rotation.z=i*2*h;g.add(o);const inn=new THREE.Group();o.add(inn);
-    const ge=new THREE.BufferGeometry(),ax=r*Math.cos(h)-r,ay=r*Math.sin(h);
-    ge.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,ax,ay,0,-r*.97,0,0,0,0,0,-r*.97,0,0,ax,-ay,0],3));ge.computeVertexNormals();
-    const m=new THREE.Mesh(ge,valveMat);m.userData.pick='av';pickables.push(m);inn.add(m);leaves.push(inn);}
-  return{g,open:0,set(t,dt){this.open+=(t-this.open)*Math.min(1,dt*28);for(const l of leaves)l.rotation.y=this.open*1.2;}};
-})(AOc.clone().addScaledVector(nAo,.05),nAo,.3,3);
-inner.push(aoValve.g);
+// ── 판막: 절차적 판엽·판륜·건삭. 판륜 위치·크기는 해부 계측값, 매 프레임 심실 수축 변형(deformPt)을 따라감 ──
+const papM=inner[0],VALVES=[];
+const vPerp=(v,u)=>v.clone().addScaledVector(u,-v.dot(u)).normalize();
+function papTips(lvSide){const pp=papM.geometry.attributes.position,aw=papM.geometry.attributes.aW,c=lvSide?MVc:TVc,u=lvSide?uLV:uRV,e2=v3(lvSide?LD.e2l:LD.e2r),G=[[],[]];
+  for(let i=0;i<pp.count;i++){const w=aw.getX(i),wr=aw.getY(i);if(lvSide?w<.5:(wr<.5||w>.5))continue;const p=new V3(pp.getX(i),pp.getY(i),pp.getZ(i)),d=p.clone().sub(c);G[d.dot(e2)>0?0:1].push([d.dot(u),p]);}
+  return G.map((g,k)=>{if(g.length<20)return c.clone().addScaledVector(u,(lvSide?LLV:LRV)*.5).addScaledVector(e2,k?-.3:.3);g.sort((x,y)=>x[0]-y[0]);const n=Math.max(8,Math.floor(g.length*.1)),s=new V3();for(let q=0;q<n;q++)s.add(g[q][1]);return s.divideScalar(n);});}
+function mkValve(o){
+  const u=o.u.clone().normalize(),e1=vPerp(o.e1,u),e2=new V3().crossVectors(u,e1),r=o.r,sl=o.type==='sl',NS=o.ns||16,NT=9,hC=.55*r;
+  const g=new THREE.Group();heart.add(g);inner.push(g);
+  const leafMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.58,metalness:0,side:THREE.DoubleSide,envMap:envTex,envMapIntensity:.22,clippingPlanes:[clip],emissive:0x000000});
+  const annMat=new THREE.MeshStandardMaterial({color:0xe6cf9e,roughness:.5,envMap:envTex,envMapIntensity:.5,clippingPlanes:[clip],emissive:0x000000});
+  const rad=th=>e1.clone().multiplyScalar(Math.cos(th)).addScaledVector(e2,Math.sin(th));
+  const rAt=th=>o.shape==='mv'?r*(1-.16*Math.pow(Math.max(0,Math.cos(th)),3)):r;
+  const zAt=(th,s)=>sl?hC*(1-Math.sin(Math.PI*s)):(o.shape==='mv'?-.13*r*Math.cos(2*th):-.06*r*Math.cos(3*th));
+  const leaves=o.leaf.map(([a0,a1,len,sc])=>{const n=NS+1,m=NT+1,pos=new Float32Array(n*m*3),col=new Float32Array(n*m*3),idx=[];
+    for(let i=0;i<NS;i++)for(let j=0;j<NT;j++){const p=i*m+j,q=(i+1)*m+j;idx.push(p,q,p+1,q,q+1,p+1);}
+    for(let i=0;i<n;i++)for(let j=0;j<m;j++){const s=i/NS,t=j/NT,k=(i*m+j)*3,ed=ss(.7,1,t),an=1-ss(0,.16,t),c0=o.col;
+      let R=c0[0]+(1-c0[0])*ed*.5+(.92-c0[0])*an*.35,G=c0[1]+(.95-c0[1])*ed*.5+(.8-c0[1])*an*.35,B=c0[2]+(.9-c0[2])*ed*.5+(.55-c0[2])*an*.35;
+      if(sl){const nd=Math.exp(-((s-.5)*(s-.5)/.006+(t-1)*(t-1)/.012));R+=nd*.18;G+=nd*.15;B+=nd*.1;}
+      col[k]=R;col[k+1]=G;col[k+2]=B;}
+    const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.BufferAttribute(pos,3));ge.setAttribute('color',new THREE.BufferAttribute(col,3));ge.setIndex(idx);
+    const mesh=new THREE.Mesh(ge,leafMat);mesh.userData.pick=o.key;mesh.renderOrder=2;mesh.frustumCulled=false;g.add(mesh);pickables.push(mesh);
+    const lenAt=s=>len*r*(sc==='scallop'?.7+.3*Math.sqrt(Math.abs(Math.sin(3*Math.PI*s))):.72+.28*Math.sqrt(Math.sin(Math.PI*s)));
+    return{a0,a1,mesh,ge,pos,n,m,lenAt};});
+  // 판륜 (방실판: 안장형 D자 고리 / 반월판: 왕관형 부착선)
+  const ring=[];if(sl)leaves.forEach(L=>{for(let i=0;i<16;i++){const s=i/16,th=L.a0+(L.a1-L.a0)*s;ring.push(c0=>c0.clone().addScaledVector(rad(th),r).addScaledVector(u,zAt(th,s)));}});
+  else for(let i=0;i<72;i++){const th=i/72*TAU;ring.push(c0=>c0.clone().addScaledVector(rad(th),rAt(th)).addScaledVector(u,zAt(th)));}
+  const RS=6,NR=ring.length,tp=new Float32Array(NR*RS*3),ti=[];for(let i=0;i<NR;i++)for(let k=0;k<RS;k++){const p=i*RS+k,q=((i+1)%NR)*RS+k,p1=i*RS+(k+1)%RS,q1=((i+1)%NR)*RS+(k+1)%RS;ti.push(p,q,p1,q,q1,p1);}
+  const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.BufferAttribute(tp,3));tg.setIndex(ti);
+  const tube=new THREE.Mesh(tg,annMat);tube.userData.pick=o.key;tube.renderOrder=2;tube.frustumCulled=false;g.add(tube);pickables.push(tube);
+  // 건삭: 유두근 끝 → 분지점 → 판엽 자유연(1차)·몸통(2차)
+  let chord=null,anchors=[],pms=o.pms||[];
+  if(pms.length){const pa=pms.map(p=>{const d=p.clone().sub(o.c);return Math.atan2(d.dot(e2),d.dot(e1));});
+    leaves.forEach((L,li)=>{for(let i=1;i<NS;i+=2)for(const j of [NT,Math.round(NT*.62)]){if(j!==NT&&i%4!==1)continue;const th=L.a0+(L.a1-L.a0)*i/NS;let best=0,bd=9;pa.forEach((x,k)=>{let d=Math.abs(Math.atan2(Math.sin(th-x),Math.cos(th-x)));if(d<bd){bd=d;best=k;}});anchors.push({li,v:i*L.m+j,pm:best});}});
+    const cp=new Float32Array(anchors.length*2*3*2);const cg=new THREE.BufferGeometry();cg.setAttribute('position',new THREE.BufferAttribute(cp,3));cg.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(cp.length),3));
+    chord=new THREE.LineSegments(cg,new THREE.LineBasicMaterial({color:0xf3e3d3,transparent:true,opacity:.78,clippingPlanes:[clip]}));chord.renderOrder=2;chord.frustumCulled=false;g.add(chord);}
+  const pmD=pms.map(p=>p.clone()),cD=new V3(),Ab=new V3(),Ad=new V3(),T=new V3(),P=new V3(),vc=new V3(),vo=new V3(),dA=new V3(),dC=new V3(),rd=new V3(),tmp=new V3();
+  const lumen=null;
+  const V={key:o.key,g,leaves,leafMat,annMat,open:0,u,c:o.c,lumen,tube:tg,tubeP:tp,
+    upd(op,time){const c=o.c;deformPt(c,cD);dC.copy(cD).sub(c);
+      for(const L of leaves){for(let i=0;i<L.n;i++){const s=i/(L.n-1),th=L.a0+(L.a1-L.a0)*s;rd.copy(rad(th));
+          Ab.copy(c).addScaledVector(rd,rAt(th)).addScaledVector(u,zAt(th,s));deformPt(Ab,Ad);dA.copy(Ad).sub(Ab);
+          // 닫힘 목표점 (접합선)
+          if(o.shape==='mv'){const x=Math.sin(th)*r*.86,y=-.1*r+.55*r*Math.pow(Math.sin(th)/.87,2);T.copy(c).addScaledVector(e1,y).addScaledVector(e2,x).addScaledVector(u,.16*r);}
+          else{const ar=s<.5?L.a0:L.a1,f=s<.5?1-2*s:2*s-1;T.copy(c).addScaledVector(rad(ar),r*.9*f).addScaledVector(u,sl?hC*.85:.18*r);}
+          const ln=L.lenAt(s),fl=Math.sin(time*(sl?37:29)+th*3+s*5)*op*(1-op*.4);
+          for(let j=0;j<L.m;j++){const t=j/(L.m-1),k=(i*L.m+j)*3,sp=Math.sin(Math.PI*t);
+            // 닫힘
+            vc.copy(T).sub(Ab).multiplyScalar(t).addScaledVector(u,sl?-r*.42*Math.pow(sp,.8)*Math.sin(Math.PI*s):-r*.22*sp*Math.sin(Math.PI*s));
+            vc.addScaledVector(u,sl?r*.28*ss(.68,1,t):r*.1*ss(.75,1,t));
+            // 열림
+            if(sl){tmp.copy(c).addScaledVector(rd,r*.88).addScaledVector(u,hC+.12*r).sub(Ab);vo.copy(tmp).multiplyScalar(t).addScaledVector(rd,-r*.1*sp*Math.sin(Math.PI*s)+r*.02*fl*t);}
+            else{vo.copy(u).multiplyScalar(t*ln).addScaledVector(rd,-t*ln*.06+ln*.08*sp+r*.035*fl*t);}
+            const lc=vc.length(),lo=vo.length(),ll=lc+(lo-lc)*op;P.copy(vc).lerp(vo,op);const pl=P.length();if(pl>1e-6)P.multiplyScalar(ll/pl);
+            P.add(Ab).addScaledVector(dA,1-t).addScaledVector(dC,t);L.pos[k]=P.x;L.pos[k+1]=P.y;L.pos[k+2]=P.z;}}
+        L.ge.attributes.position.needsUpdate=true;L.ge.computeVertexNormals();L.ge.computeBoundingSphere();}
+      // 판륜 관
+      for(let i=0;i<NR;i++){Ab.copy(ring[i](c));deformPt(Ab,Ad);const nx=ring[(i+1)%NR](c),pv=ring[(i-1+NR)%NR](c);tmp.copy(nx).sub(pv).normalize();
+        rd.copy(Ab).sub(c);rd.addScaledVector(u,-rd.dot(u)).normalize();const bn=new V3().crossVectors(tmp,rd).normalize(),tr=sl?.016:.024;
+        for(let k=0;k<RS;k++){const an=k/RS*TAU;P.copy(Ad).addScaledVector(rd,Math.cos(an)*tr).addScaledVector(bn,Math.sin(an)*tr);tp.set([P.x,P.y,P.z],(i*RS+k)*3);}}
+      tg.attributes.position.needsUpdate=true;tg.computeVertexNormals();tg.computeBoundingSphere();
+      // 상태 발광: 열림 초록 / 닫힘 호박색 (기존 개폐 고리 역할)
+      annMat.emissive.setRGB(.42-.36*op,.22+.2*op,.06+.06*op);leafMat.emissive.setRGB(.1,.045,.035);
+      if(chord){pms.forEach((p,k)=>deformPt(p,pmD[k]));const cp=chord.geometry.attributes.position.array;let w=0;
+        for(const A of anchors){const L=leaves[A.li],q=A.v*3,pm=pmD[A.pm];tmp.set(L.pos[q],L.pos[q+1],L.pos[q+2]);P.copy(pm).lerp(tmp,.55).addScaledVector(u,-.02);
+          cp.set([pm.x,pm.y,pm.z,P.x,P.y,P.z,P.x,P.y,P.z,tmp.x,tmp.y,tmp.z],w);w+=12;}
+        chord.geometry.attributes.position.needsUpdate=true;}}};
+  VALVES.push(V);V.upd(0,0);return V;}
+const d60=Math.PI/180;
+const vMV=mkValve({key:'mv',c:MVc,u:uLV,e1:AOc.clone().sub(MVc),r:.36,shape:'mv',col:[.9,.62,.56],ns:18,
+  leaf:[[-62*d60,62*d60,1.45,'round'],[62*d60,298*d60,.95,'scallop']],pms:papTips(true)});
+const tvSept=MVc.clone().sub(TVc);
+const vTV=mkValve({key:'tv',c:TVc,u:uRV,e1:tvSept,r:.38,col:[.88,.63,.6],
+  leaf:[[-60*d60,60*d60,1.05,'round'],[60*d60,200*d60,1.2,'round'],[200*d60,300*d60,.95,'round']],
+  pms:papTips(false).concat([TVc.clone().addScaledVector(uRV,LRV*.36).addScaledVector(vPerp(tvSept,uRV),.3)])});
+const vAV=mkValve({key:'av',c:AOc.clone().addScaledVector(nAo,.02),u:nAo,e1:MVc.clone().sub(AOc),r:.3,type:'sl',col:[.93,.76,.66],ns:14,
+  leaf:[[0,120*d60],[120*d60,240*d60],[240*d60,360*d60]]});
+const vPV=mkValve({key:'pv',c:PVc.clone().addScaledVector(nPv,-.04),u:nPv,e1:AOc.clone().sub(PVc),r:.28,type:'sl',col:[.9,.74,.7],ns:14,
+  leaf:[[30*d60,150*d60],[150*d60,270*d60],[270*d60,390*d60]]});
+const aoValve={g:vAV.g,open:0,set(t,dt){this.open+=(t-this.open)*Math.min(1,dt*28);}};
 // 폐색 표지
 const occMat=new THREE.MeshBasicMaterial({color:0x05070a});
 const occLAD=new THREE.Mesh(new THREE.SphereGeometry(.07,14,10),occMat),occRCA=occLAD.clone();
@@ -498,7 +562,7 @@ const PART={
   lv:['좌심실 (LV)','전신으로 혈액을 내보내는 두꺼운 근육 방'],rv:['우심실 (RV)','폐동맥으로 정맥혈을 보내는 방'],la:['좌심방 (LA)','폐정맥에서 산소화된 혈액을 받음'],ra:['우심방 (RA)','상·하대정맥에서 정맥혈을 받음'],
   ao:['대동맥','상행 → 궁 → 하행. 궁에서 머리·팔로 가는 분지가 나옴'],pa:['폐동맥','우심실의 정맥혈을 양쪽 폐로 보냄'],pvn:['폐정맥','폐에서 산소화된 혈액을 좌심방으로'],svc:['상대정맥 (SVC)','상체의 정맥혈을 우심방으로'],ivc:['하대정맥 (IVC)','하체의 정맥혈을 우심방으로'],
   rca:['우관상동맥 (RCA)','우심실, 하벽, 대개 SA·AV node에 혈류 공급'],lad:['좌전하행지 (LAD)','좌심실 전벽, 심첨부, 중격 앞쪽 2/3'],lcx:['좌주간부·좌회선지 (LCx)','좌심실 측벽과 후벽'],cvn:['관상정맥동·대심장정맥','심근의 정맥혈을 우심방으로'],
-  mv:['승모판과 건삭','좌심방–좌심실 사이. 전엽·후엽 2개'],tv:['삼첨판과 건삭','우심방–우심실 사이. 판엽 3개'],pv:['폐동맥판','우심실 유출로의 반월판'],av:['대동맥판','좌심실 유출로의 반월판 (모형은 단순화)'],pap:['유두근','건삭을 당겨 방실판막의 역류를 막음'],
+  mv:['승모판과 건삭 (Mitral valve)','좌심방–좌심실 사이. 큰 전엽 + 가리비 모양 후엽(P1·P2·P3). 안장형 판륜, 건삭은 전외측·후내측 유두근으로. 이완기 열림 · 수축기 닫힘'],tv:['삼첨판과 건삭 (Tricuspid valve)','우심방–우심실 사이. 전엽·후엽·중격엽 3개, 건삭은 우심실 유두근과 중격으로. 이완기 열림 · 수축기 닫힘'],pv:['폐동맥판 (Pulmonic valve)','우심실 유출로의 반월판. 반월첨 3개가 왕관형 판륜에 붙음. 박출기 열림 · 이완기 닫힘'],av:['대동맥판 (Aortic valve)','좌심실 유출로의 반월판. 좌관상첨·우관상첨·무관상첨 3개, 가운데 결절(Arantius). 박출기 열림 · 이완기 닫혀 관상동맥 관류'],pap:['유두근','건삭을 당겨 방실판막의 역류를 막음'],
   sa:['동방결절 (SA node)','정상 박동의 시작점'],avn:['방실결절 (AV node)','심방 → 심실 전도를 지연시키는 관문'],inod:['결절간 경로','SA node에서 AV node로'],bach:['Bachmann 다발','우심방에서 좌심방으로 흥분 전달'],his:['His 다발','AV node에서 심실중격으로'],
   lbb:['좌각 (전·후 섬유속)','좌심실 심내막으로 전도'],rbb:['우각','중격 우측을 따라 우심실로'],purkL:['Purkinje 섬유 (좌심실)','심내막에서 심근으로 빠르게 전달'],purkR:['Purkinje 섬유 (우심실)','심내막에서 심근으로 빠르게 전달']};
 const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),call=$('call');let sel=null,down=null;
@@ -573,7 +637,12 @@ const HP={ao:bz([276,152],[276,72],[330,28],[446,36],30),pa:bz([246,152],[246,88
 const silPath=c=>{c.beginPath();c.moveTo(260,72);c.bezierCurveTo(214,36,138,52,138,122);c.bezierCurveTo(138,192,214,252,292,284);c.bezierCurveTo(352,252,398,192,392,122);c.bezierCurveTo(388,54,306,36,260,72);c.closePath();};
 const rvPath=c=>{c.beginPath();c.moveTo(166,154);c.lineTo(246,154);c.bezierCurveTo(252,200,258,236,264,262);c.bezierCurveTo(216,246,168,206,166,154);c.closePath();};
 const lvPath=c=>{c.beginPath();c.moveTo(284,154);c.lineTo(364,154);c.bezierCurveTo(366,206,330,250,294,270);c.bezierCurveTo(282,236,278,196,284,154);c.closePath();};
-function leaflets(c,x0,x1,y,open,dir,col){const h=(x1-x0)/2,a=open*1.2*dir;c.strokeStyle=col;c.lineWidth=3.2;c.beginPath();c.moveTo(x0,y);c.lineTo(x0+h*Math.cos(a),y+h*Math.sin(a));c.moveTo(x1,y);c.lineTo(x1-h*Math.cos(a),y+h*Math.sin(a));c.stroke();}
+function leaflets(c,x0,x1,y,open,dir,col){const h=(x1-x0)/2,a=open*1.25*dir,av=dir>0;c.save();c.lineCap='round';
+  [[x0,1],[x1,-1]].forEach(([xa,sg])=>{const L=h*(av?1.02:.98),ex=xa+sg*L*Math.cos(a),ey=y+L*Math.sin(a),mx=(xa+ex)/2,my=(y+ey)/2,bw=(av?-1:1)*(1-open)*6,nx=-(ey-y)/L*sg,ny=(ex-xa)/L*sg,cx=mx+nx*bw,cy=my+ny*bw;
+    if(av){const px=xa+sg*h*.55,py=y+46;c.strokeStyle='rgba(245,228,212,.5)';c.lineWidth=.8;c.beginPath();c.moveTo(px,py);c.lineTo(ex,ey);c.moveTo(px,py);c.lineTo(mx,my);c.stroke();c.fillStyle='rgba(150,70,70,.85)';c.beginPath();c.ellipse(px,py+5,3.2,7,0,0,TAU);c.fill();}
+    c.strokeStyle='rgba(0,0,0,.5)';c.lineWidth=5.4;c.beginPath();c.moveTo(xa,y);c.quadraticCurveTo(cx,cy,ex,ey);c.stroke();
+    c.strokeStyle='#f1dccd';c.lineWidth=3.4;c.stroke();c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1.1;c.stroke();
+    c.fillStyle=col;c.beginPath();c.arc(xa,y,2.6,0,TAU);c.fill();});c.restore();}
 // 4방 단면 기본도. o:{lv,rv,at,mv,tv,av,pv,dim,aoCol}
 function heartBase(c,o){
   const tube=(pts,col,w)=>{pln(c,pts,'rgba(0,0,0,.55)',w+4);pln(c,pts,col,w);};
@@ -612,7 +681,7 @@ flow(c,now){
   if(sim.sc.id==='pea')echip(c,260,60,'전기 활동은 있지만 심실이 수축하지 못함 → 맥박 없음','#ff9aa3','c');
   if((sim.sc.flags||{}).hcm){c.fillStyle='#7a2630';c.strokeStyle='#ffcf70';c.lineWidth=1.2;c.beginPath();c.ellipse(268,188,15,34,.08,0,TAU);c.fill();c.stroke();echip(c,404,236,'비대칭 중격 비후 → 유출로 폐쇄','#ffcf70','c');}
   etx(c,190,112,'RA','#fff',13,'center','600');etx(c,326,108,'LA','#fff',13,'center','600');etx(c,212,196,'RV','#fff',14,'center','600');etx(c,320,200,'LV','#fff',14,'center','600');
-  etx(c,446,20,'대동맥 → 전신','#ffb0a8',11,'right');etx(c,74,20,'폐동맥 → 폐','#a9c8ff',11);etx(c,204,12,'상대정맥','#a9c8ff',10.5);etx(c,470,74,'폐정맥','#ffb0a8',10.5,'right');etx(c,92,236,'하대정맥','#a9c8ff',10.5,'center');
+  etx(c,446,20,'대동맥 → 전신','#ffb0a8',11,'right');etx(c,14,76,'폐동맥 → 폐','#a9c8ff',11);etx(c,204,12,'상대정맥','#a9c8ff',10.5);etx(c,470,74,'폐정맥','#ffb0a8',10.5,'right');etx(c,92,236,'하대정맥','#a9c8ff',10.5,'center');
   echip(c,404,176,'방실판막 MV·TV '+(mv>.5?'열림':'닫힘'),mv>.5?'#7cf5a6':'#ffcf70');echip(c,404,200,'반월판 AV·PV '+(av>.5?'열림':'닫힘'),av>.5?'#7cf5a6':'#ffcf70');
   etx(c,14,22,phPrev,'#e6eef5',15,'left','600');etx(c,14,42,'3D 화면과 같은 박동입니다','#8fa3b5',10.5);
   ecgStrip(c);
@@ -908,7 +977,7 @@ const CAV=`<section><h3>실측 기록 주의 · Real-data caveats</h3><ul>
 </ul></section>
 <section><h3>일반 주의 · General caveats</h3><ul>
 <li>교육용 시뮬레이션입니다. 실제 진료 판단과 환자 치료에 사용하지 마세요.</li>
-<li>3D 모형은 BodyParts3D 성인 남성 1인 해부를 바탕으로 하며, 판막과 대혈관은 단순화했습니다. 대동맥판은 판엽 모형입니다.</li>
+<li>3D 모형은 BodyParts3D 성인 남성 1인 해부를 바탕으로 하며, 대혈관은 단순화했습니다. 판막 4개는 실제 판륜 위치·크기에 맞춘 판엽 모형(판륜·건삭 포함)입니다.</li>
 <li>소아 질환(VSD, ASD, PDA, TOF, HCM, 가와사키)은 소아 모형이 아니라 성인 모형에 결손 위치와 혈류를 도식으로 얹은 것입니다.</li>
 <li>색은 관례 표시입니다. 빨강은 동맥혈, 파랑은 정맥혈을 뜻하며 실제 혈액 색이 아닙니다.</li>
 <li>해설(2D) 화면은 개념 이해용으로 단순화했습니다.</li>
@@ -936,9 +1005,9 @@ function frame(now){
   const C=SU.uC.value;C[0]=L.c;C[1]=R.c;C[2]=aC-.35*L.c;C[3]=aC-.35*R.c;
   SU.uQv.value.set(f.vfib?1:0,f.afib?.8:(f.flutter?.3:0));SU.uT.value=t;SU.uGlow.value=vm==='flow'?0:1;
   const idle=perf<.12&&L.c<.02,k=Math.min(1,real*26);
-  vOpen.mv.value+=((idle?.4:(L.avOpen?(.6+.4*clamp(L.fill*.4+L.kick*2,0,1)):0))-vOpen.mv.value)*k;
+  if(dt>0){vOpen.mv.value+=((idle?.4:(L.avOpen?(.6+.4*clamp(L.fill*.4+L.kick*2,0,1)):0))-vOpen.mv.value)*k;
   vOpen.tv.value+=((idle?.4:(R.avOpen?(.6+.4*clamp(R.fill*.4+R.kick*2,0,1)):0))-vOpen.tv.value)*k;
-  vOpen.pv.value+=((R.semiOpen?1:0)-vOpen.pv.value)*k;aoValve.set(L.semiOpen?1:0,real);
+  vOpen.pv.value+=((R.semiOpen?1:0)-vOpen.pv.value)*k;aoValve.set(L.semiOpen?1:0,real);}
   if((ly.flow&&vm!=='elec')&&dt>0)stepParticles(dt,S);
 
   // 전기 흥분 파면
@@ -1017,7 +1086,7 @@ function mkNet(polys){
 }
 const netL=mkNet(NET.L),netR=mkNet(NET.R);
 // 판막 개폐 표시 고리
-const vRing=(p,n,r)=>{const m=new THREE.Mesh(new THREE.TorusGeometry(r,.016,8,40),new THREE.MeshBasicMaterial({color:0x3ddc84,clippingPlanes:[clip]}));m.position.copy(p);m.quaternion.setFromUnitVectors(new V3(0,0,1),n);m.userData.base=p.clone();m.renderOrder=9;heart.add(m);inner.push(m);return m;};
+const vRing=(p,n,r)=>{const m=new THREE.Mesh(new THREE.TorusGeometry(r,.016,8,40),new THREE.MeshBasicMaterial({color:0x3ddc84,clippingPlanes:[clip]}));m.position.copy(p);m.quaternion.setFromUnitVectors(new V3(0,0,1),n);m.userData.base=p.clone();m.renderOrder=9;return m;};
 const rings={mv:vRing(MVc,uLV,.36),tv:vRing(TVc,uRV,.38),pv:vRing(PVc,nPv,.27),av:vRing(AOc,nAo,.31)};
 const ringCol=(m,o)=>m.material.color.setRGB(.95-.72*o,.25+.62*o,.3+.2*o);
 const aoMat=vessels[0].material,paMat=vessels[1].material;
@@ -1169,6 +1238,7 @@ function extrasFrame(real,dt,t,L,R,now){lastLR=[L,R];
   [L,R].forEach((s,i)=>{const on=s.ej>0;if(on&&!ejPrev[i])ejT[i]=t;ejPrev[i]=on;const d=(t-ejT[i])*7.5;(i?paMat:aoMat).userData.own.uJo.value.w=d<5?d+.01:-1;});
   ringCol(rings.mv,vOpen.mv.value);ringCol(rings.tv,vOpen.tv.value);ringCol(rings.pv,vOpen.pv.value);ringCol(rings.av,aoValve.open);
   deformPt(rings.mv.userData.base,rings.mv.position);deformPt(rings.tv.userData.base,rings.tv.position);
+  if(ly.val&&!(SU.uFlu.value>.5)){vMV.upd(vOpen.mv.value,t);vTV.upd(vOpen.tv.value,t);vAV.upd(aoValve.open,t);vPV.upd(vOpen.pv.value,t);}
   // Purkinje 망 발광
   let a=0,b=0;for(const o of cond){if(o.key==='purkL')a=Math.max(a,o.lit);else if(o.key==='purkR')b=Math.max(b,o.lit);}
   netL.material.color.setRGB(.24+.66*a,.3+.7*a,.08+.27*a);netR.material.color.setRGB(.24+.66*b,.3+.7*b,.08+.27*b);
@@ -1197,6 +1267,7 @@ function viewBasis(name){
   if(name==='plax'||name.indexOf('psax')===0){
     D=perp(new V3(0,0,-1),uLV);
     if(name==='plax'){N=new V3().crossVectors(uLV,AOc.clone().sub(MVc)).normalize();D=perp(D,N);tg=MVc.clone().lerp(lvMid,.45);ref=LVap;}
+    else if(name==='psax-av'){N=nAo.clone().normalize();D=perp(new V3(0,0,-1),N);tg=AOc.clone().addScaledVector(nAo.clone().normalize(),.12);ref=TVc;}
     else{N=uLV.clone();tg=name==='psax-av'?AOc.clone():name==='psax-mv'?MVc.clone().addScaledVector(uLV,.22*LLV):MVc.clone().addScaledVector(uLV,.55*LLV);ref=TVc;}
     P=tg.clone().addScaledVector(D,-2.25);
   }else if(name==='a4c'||name==='a2c'){
@@ -1215,7 +1286,7 @@ function aimCursor(){const d=EB.tg.clone().sub(EB.P);ECHO.cur=clamp(Math.atan2(d
 function setupEchoCam(){const {P,D,N}=EB,C=P.clone().addScaledVector(D,DMAX/2);
   eCam.left=-WD/2;eCam.right=WD/2;eCam.top=DMAX/2;eCam.bottom=-DMAX/2;eCam.updateProjectionMatrix();
   eCam.position.copy(C).addScaledVector(N,10);eCam.up.copy(D).negate();eCam.lookAt(C);eCam.updateMatrixWorld();
-  ePlane.set(N.clone().negate(),N.dot(P));ePlane2.set(N.clone(),-(N.dot(P)-.07));}
+  ePlane.set(N.clone().negate(),N.dot(P));ePlane2.set(N.clone(),-(N.dot(P)-.1));}
 // 3D probe & fan
 const fanMat=new THREE.MeshBasicMaterial({color:0x57d3e6,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false});
 const fanEdge=new THREE.LineBasicMaterial({color:0x8fefff,transparent:true,opacity:.95,depthTest:false});
@@ -1275,8 +1346,31 @@ const mMat=new THREE.ShaderMaterial({uniforms:EU,vertexShader:QVS,depthTest:fals
 void main(){vec3 c=texture2D(tM,vUv).rgb;float g=fract(vUv.x-uCol);if(g>0.&&g<.012)c=vec3(0.);gl_FragColor=vec4(c,1.);}`});
 const dScene=new THREE.Scene(),cScene=new THREE.Scene(),mScene=new THREE.Scene();
 dScene.add(new THREE.Mesh(qGeo,dMat));cScene.add(new THREE.Mesh(qGeo,cMat));mScene.add(new THREE.Mesh(qGeo,mMat));
-const slabMat=new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide});
-const avLeaf=[];aoValve.g.traverse(o=>{if(o.isMesh)avLeaf.push(o);});
+const slabMat=new THREE.ShaderMaterial({side:THREE.DoubleSide,depthTest:false,clipping:true,
+  vertexShader:`#include <common>
+#include <clipping_planes_pars_vertex>
+varying float vNz;
+void main(){vNz=length(normal)<.01?0.:abs(normalize(normalMatrix*normal).z);
+#include <begin_vertex>
+#include <project_vertex>
+#include <clipping_planes_vertex>
+}`,fragmentShader:`#include <common>
+#include <clipping_planes_pars_fragment>
+varying float vNz;
+void main(){
+#include <clipping_planes_fragment>
+float f=1.-smoothstep(.5,.93,vNz);gl_FragColor=vec4(vec3(max(f,.14)),1.);}`});
+// 초음파: 판막 판엽·판륜이 단면과 만나는 선을 CPU로 정확히 계산해 밝은 에코선으로 그림
+const vCutP=new Float32Array(12000*6),vCutG=new THREE.BufferGeometry();vCutG.setAttribute('position',new THREE.BufferAttribute(vCutP,3));vCutG.setAttribute('normal',new THREE.BufferAttribute(new Float32Array(vCutP.length),3));
+const vCut=new THREE.LineSegments(vCutG,new THREE.LineBasicMaterial({color:0xffffff}));vCut.frustumCulled=false;vCut.visible=false;heart.add(vCut);const avLeaf=[vCut];
+function cutValves(N,d){let w=0;const O=vCutP,cap=O.length-6;
+  const run=(pos,idx)=>{for(let k=0;k<idx.length&&w<cap;k+=3){const a3=idx[k]*3,b3=idx[k+1]*3,c3=idx[k+2]*3;
+      const da=N.x*pos[a3]+N.y*pos[a3+1]+N.z*pos[a3+2]-d,db=N.x*pos[b3]+N.y*pos[b3+1]+N.z*pos[b3+2]-d,dc=N.x*pos[c3]+N.y*pos[c3+1]+N.z*pos[c3+2]-d;
+      if((da>0&&db>0&&dc>0)||(da<0&&db<0&&dc<0))continue;let n=0;
+      for(const [p,q,dp,dq] of [[a3,b3,da,db],[b3,c3,db,dc],[c3,a3,dc,da]]){if((dp>0)===(dq>0)||dp===dq)continue;const t=dp/(dp-dq);O[w++]=pos[p]+(pos[q]-pos[p])*t;O[w++]=pos[p+1]+(pos[q+1]-pos[p+1])*t;O[w++]=pos[p+2]+(pos[q+2]-pos[p+2])*t;if(++n===2)break;}
+      if(n===1)w-=3;}};
+  for(const V of VALVES){if(!V.g.visible)continue;for(const L of V.leaves)run(L.pos,L.ge.index.array);run(V.tubeP,V.tube.index.array);}
+  vCutG.setDrawRange(0,w/3);vCutG.attributes.position.needsUpdate=true;}
 const vis=new Map();
 function solo(list){heart.traverse(o=>{if(o!==heart){vis.set(o,o.visible);o.visible=false;}});list.forEach(o=>{let p=o;while(p&&p!==heart){p.visible=true;p=p.parent;}});}
 function unsolo(){vis.forEach((v,o)=>{o.visible=v;});vis.clear();}
@@ -1297,11 +1391,14 @@ function camStep(){if(!ECam)return;const k=Math.min(1,(performance.now()-ECam.s)
 controls.addEventListener('start',()=>{ECam=null;});
 function echoPass(){
   curBasis();const anim=!!EBa;const key=ECHO.view+'|'+ECHO.tilt+'|'+ECHO.rot+'|'+sim.sc.id+'|'+(proc.reperf?1:0)+'|'+Math.round(SU.uIsc.value.w*10)+'|'+ECHO.cur.toFixed(2);setupEchoCam();if(anim||key!==ECHO.key){ECHO.key=anim?'':key;buildFan();drawEchoOv();}
-  const bg=scene.background;scene.background=null;const list=[wallF,wallB].concat(inner.slice(0,4));
+  const bg=scene.background;scene.background=null;const list=[wallF,wallB,papM];
   solo(list);const dw=list.map(m=>m.material.depthWrite);list.forEach(m=>{m.material.depthWrite=true;});
   SU.uEcho.value=1;renderer.clippingPlanes=[ePlane];renderer.setRenderTarget(rtE);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(scene,eCam);
   unsolo();list.forEach((m,i)=>{m.material.depthWrite=dw[i];});
-  solo(avLeaf);scene.overrideMaterial=slabMat;renderer.clippingPlanes=[ePlane,ePlane2];renderer.autoClear=false;renderer.render(scene,eCam);renderer.autoClear=true;scene.overrideMaterial=null;unsolo();
+  renderer.clippingPlanes=[];renderer.autoClear=false;cutValves(EB.N,EB.N.dot(EB.P)-.03);
+  solo(avLeaf);scene.overrideMaterial=slabMat;
+  {const px=WD/RTW*1.1,p0=eCam.position.clone();for(const [dx,dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1],[.7,.7],[-.7,-.7],[.7,-.7],[-.7,.7]]){eCam.position.copy(p0).addScaledVector(EB.L,dx*px).addScaledVector(EB.D,dy*px);eCam.updateMatrixWorld();renderer.render(scene,eCam);}eCam.position.copy(p0);eCam.updateMatrixWorld();}
+  renderer.autoClear=true;scene.overrideMaterial=null;unsolo();
   renderer.clippingPlanes=[];SU.uEcho.value=0;scene.background=bg;renderer.setRenderTarget(null);
 }
 function mmodePass(){const col=Math.floor(((sim.t%EWIN)/EWIN)*MW)%MW;EU.uCol.value=col/MW;
@@ -1348,7 +1445,7 @@ function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eO
   boxText(c,6,h-8,'깊이 16 cm','500 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif','rgba(214,226,236,.9)');
   c.fillStyle='#ffe678';c.beginPath();const mx=ox+Math.sin(ANG)*.3*sx+14;c.moveTo(mx,8);c.lineTo(mx+8,8);c.lineTo(mx+4,15);c.closePath();c.fill();
   {const {P,D,N,L}=EB,dd=new V3();c.font='600 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif';
-   CHAM.forEach(ch=>{dd.copy(ch[1]).sub(P);if(Math.abs(dd.dot(N))>.45)return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.95||yd>DMAX*.95||yd<.3)return;
+   CHAM.forEach(ch=>{dd.copy(ch[1]).sub(P);if(Math.abs(dd.dot(N))>.45||(ECHO.view==='psax-av'&&ch[0].indexOf('Ao')===0))return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.95||yd>DMAX*.95||yd<.3)return;
      const t=ch[0].split(' ')[0],tw=c.measureText(t).width,x=ox+xl*sx-tw/2-5,y=yd*sy+5;c.fillStyle='rgba(4,8,13,.55)';rrect(c,x,y-13,tw+10,18,4);c.fill();c.fillStyle=ch[2];c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,x+5,y);});
    c.font='500 '+(fs-1.5)+'px "IBM Plex Sans KR",sans-serif';c.strokeStyle='rgba(255,230,120,.85)';c.lineWidth=1.2;
    estr().forEach(([t,p],k)=>{dd.copy(p).sub(P);if(Math.abs(dd.dot(N))>.3)return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.92||yd>DMAX*.92||yd<.35)return;
