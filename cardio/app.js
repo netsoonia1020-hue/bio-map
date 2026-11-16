@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 14';
+const VER='Ver.cardio 15';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1171,7 +1171,7 @@ function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360
   camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
 $('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
 /* ───────────── 9. 심초음파 (2D echo + M-mode) ───────────── */
-const ECHO={tab:'fn',adj:false,on:false,view:'plax',tilt:0,rot:0,mm:false,cur:0,lastCol:-1,key:''};
+const ECHO={dop:true,tab:'fn',adj:false,on:false,view:'plax',tilt:0,rot:0,mm:false,cur:0,lastCol:-1,key:''};
 const RTW=448,RTH=356,MW=600,MH=256,DMAX=3.9,ANG=.68,WD=2*DMAX*Math.sin(ANG),EWIN=4;
 const rtE=new THREE.WebGLRenderTarget(RTW,RTH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
 const rtM=new THREE.WebGLRenderTarget(MW,MH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:false});
@@ -1312,7 +1312,7 @@ function echoRender(real){
   if(!m&&ECHO.tab==='3d'){const q=rectOf($('e3D'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=2.1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
   if(ECHO.mm&&ECHO.tab==='mm'){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
   renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
-  lvTick(real);
+  lvTick(real);drawDoppler(real);
   if(ECHO.mm){const w=eEcg.clientWidth,h=eEcg.clientHeight;if(eEcg.width!==Math.round(w*dpr)){eEcg.width=Math.round(w*dpr);eEcg.height=Math.round(h*dpr);}
     const ctx=eEcg.getContext('2d');ex=ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);trace(buf[1],0,h*.62,w,EWIN,h*.32,'#6ff09a',1.5);ex=ecgCtx;}
 }
@@ -1350,6 +1350,35 @@ function setEcho(on){ECHO.on=on;$('tEcho').textContent=on?'초음파 닫기':'�
   else{renderer.setScissorTest(false);sizeAll();resetView();}}
 $('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));
 $('eBack').addEventListener('click',()=>setEcho(false));
+/* color Doppler: blood particles crossing the scan plane, red = toward probe, blue = away */
+let dGrid=null;const eFlow=$('eFlow'),dPrev=new Float32Array(NP*3),dVel=new Float32Array(NP*3);let dInit=false;
+$('eDop').addEventListener('click',()=>{ECHO.dop=!ECHO.dop;$('eDop').setAttribute('aria-pressed',ECHO.dop);});
+function drawDoppler(real){const w=echoS.clientWidth,h=echoS.clientHeight;if(!w)return;
+  if(eFlow.width!==Math.round(w*dpr)||eFlow.height!==Math.round(h*dpr)){eFlow.width=Math.round(w*dpr);eFlow.height=Math.round(h*dpr);}
+  const c=eFlow.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
+  const dt=paused?0:real*speed;
+  if(dt>0){if(!dInit){dPrev.set(hPos);dInit=true;}for(let i=0;i<NP*3;i++){const v=(hPos[i]-dPrev[i])/dt;dVel[i]=Math.abs(v)<40?dVel[i]*.4+v*.6:dVel[i];dPrev[i]=hPos[i];}}
+  if(!ECHO.dop||!(ly.flow&&vm!=='elec'))return;
+  const {P,D,N,L}=EB,sx=w/WD,sy=h/DMAX,ox=w/2,R=Math.max(3,w*.022);
+  // Doppler colour box (ROI)
+  c.strokeStyle='rgba(255,255,255,.28)';c.lineWidth=1;c.setLineDash([4,4]);c.beginPath();const a0=-ANG*.75,a1=ANG*.75,r0=DMAX*.18,r1=DMAX*.92;
+  c.moveTo(ox+Math.sin(a0)*r0*sx,Math.cos(a0)*r0*sy);for(let k=0;k<=16;k++){const t=a0+(a1-a0)*k/16;c.lineTo(ox+Math.sin(t)*r0*sx,Math.cos(t)*r0*sy);}
+  for(let k=16;k>=0;k--){const t=a0+(a1-a0)*k/16;c.lineTo(ox+Math.sin(t)*r1*sx,Math.cos(t)*r1*sy);}c.closePath();c.stroke();c.setLineDash([]);
+  const GW=72,GH=Math.max(8,Math.round(GW*h/w));if(!dGrid||dGrid.w!==GW||dGrid.h!==GH){const cv=document.createElement('canvas');cv.width=GW;cv.height=GH;dGrid={w:GW,h:GH,cv,ctx:cv.getContext('2d'),sum:new Float32Array(GW*GH),n:new Float32Array(GW*GH)};}
+  dGrid.sum.fill(0);dGrid.n.fill(0);
+  for(let i=0;i<NP;i++){const j=i*3,px=hPos[j]-P.x,py=hPos[j+1]-P.y,pz=hPos[j+2]-P.z,dn=px*N.x+py*N.y+pz*N.z;if(Math.abs(dn)>.22)continue;
+    const xl=px*L.x+py*L.y+pz*L.z,yd=px*D.x+py*D.y+pz*D.z,rr=Math.hypot(xl,yd),th=Math.atan2(xl,yd);if(th<a0||th>a1||rr<r0||rr>r1)continue;
+    const vr=-(dVel[j]*px+dVel[j+1]*py+dVel[j+2]*pz)/Math.max(.01,Math.hypot(px,py,pz)),gx=Math.floor((xl/WD+.5)*GW),gy=Math.floor(yd/DMAX*GH);
+    for(let oy=-1;oy<=1;oy++)for(let oxx=-1;oxx<=1;oxx++){const X=gx+oxx,Y=gy+oy;if(X<0||Y<0||X>=GW||Y>=GH)continue;const wt=oxx||oy?.45:1,k=Y*GW+X;dGrid.sum[k]+=vr*wt;dGrid.n[k]+=wt;}}
+  const im=dGrid.ctx.createImageData(GW,GH),d=im.data;
+  for(let k=0;k<GW*GH;k++){const n=dGrid.n[k];if(n<.6)continue;const v=dGrid.sum[k]/n,s=clamp(Math.abs(v)/2.4,0,1);if(s<.05)continue;const o=k*4;
+    if(v>0){d[o]=150+105*s;d[o+1]=30+170*s*s;d[o+2]=20;}else{d[o]=20+40*s*s;d[o+1]=60+160*s*s;d[o+2]=170+85*s;}
+    d[o+3]=Math.round(255*clamp(.35+.5*s,0,.85)*clamp(n/2,0,1));}
+  dGrid.ctx.putImageData(im,0,0);c.imageSmoothingEnabled=true;c.drawImage(dGrid.cv,0,0,w,h);
+  // colour scale bar
+  const bx=w-14,by=h*.32,bh=h*.32,gr=c.createLinearGradient(0,by,0,by+bh);gr.addColorStop(0,'#ffc814');gr.addColorStop(.25,'#c8281a');gr.addColorStop(.5,'#000');gr.addColorStop(.75,'#2c50d0');gr.addColorStop(1,'#3cd8ff');
+  c.fillStyle=gr;c.fillRect(bx,by,6,bh);c.strokeStyle='rgba(255,255,255,.4)';c.strokeRect(bx-.5,by-.5,7,bh+1);
+  c.fillStyle='rgba(230,238,245,.85)';c.font='500 9.5px "IBM Plex Mono",monospace';c.textAlign='right';c.textBaseline='middle';c.fillText('+',bx-3,by+4);c.fillText('−',bx-3,by+bh-4);}
 EVIEWS.forEach(([k,ab,sh,nm])=>{const b=document.createElement('button');b.type='button';b.dataset.v=k;b.innerHTML='<b></b><small></small>';b.firstChild.textContent=ab;b.lastChild.textContent=sh;b.title=nm;b.setAttribute('aria-pressed',k===ECHO.view);
   b.addEventListener('click',()=>{ECHO.animNext=true;ECHO.view=k;ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(k);aimCursor();[...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x===b));});$('eView').appendChild(b);});
 $('eTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.v);});
