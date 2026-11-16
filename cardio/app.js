@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 20';
+const VER='Ver.cardio 21';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -520,7 +520,7 @@ function pickAt(e){
 }
 
 /* 크기 */
-function fitD(h,t){const asp=camera.aspect,port=asp<.8;return Math.max((h<420?3.6:(port?4.5:3.25))/t,(port?4.3:2.6)/(t*asp));}
+function fitD(h,t){const asp=camera.aspect,v=h<420?3.6:(asp>1.25?3.4:4.4);return Math.max(v/t,3.9/(t*asp));}
 function sizeAll(){
   const w=view.clientWidth,h=view.clientHeight;if(!w||!h)return;
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
@@ -1435,7 +1435,7 @@ function echoReset(){const d=ECHO.def||['plax'];ECHO.animNext=!!EBcur&&ECHO.on;E
   [...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===ECHO.view));}
 function echoCase(sc){const d=ECHO_DEF[sc.id]||['plax','기본 평가'];ECHO.def=d;const v=EVIEWS.find(q=>q[0]===d[0]);$('eRec').textContent='루틴 단면 · '+v[3]+' — '+d[1];if(ECHO.on)echoReset();}
 $('eReset').addEventListener('click',echoReset);
-$('ePause').addEventListener('click',()=>$('tPause').click());new MutationObserver(()=>$('ePause').setAttribute('aria-pressed',$('tPause').getAttribute('aria-pressed'))).observe($('tPause'),{attributes:true});
+$('ePause').addEventListener('click',()=>$('tPause').click());$('eClose').addEventListener('click',()=>setEcho(false));new MutationObserver(()=>$('ePause').setAttribute('aria-pressed',$('tPause').getAttribute('aria-pressed'))).observe($('tPause'),{attributes:true});
 /* LV function: EF / SV / CO, live LV volume, 17-segment wall motion */
 const EDV={hf:185,pedema:165,hcm:85,sbrady:135,chb:150,vsd:150,asd:130,avb1:125};
 const SEG_LAD=[1,2,7,8,13,14,17],SEG_RCA=[3,4,9,10,15],SEG_LCX=[5,6,11,12,16];
