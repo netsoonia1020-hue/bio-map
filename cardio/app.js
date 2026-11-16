@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 19';
+const VER='Ver.cardio 20';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -299,7 +299,9 @@ const ORG={lvN:v3(LD.lvN),lvSept:v3(LD.lvSept),lvFoc:v3(LD.lvFoc),rvN:v3(LD.rvN)
 
 /* 혈류 입자 (머리 + 꼬리 선분, 가산 혼합) */
 const paths=[];
-['L','R'].forEach((s,si)=>HM.land.F[s].forEach(f=>{const n=f.p.length-1;paths.push({curve:new THREE.CatmullRomCurve3(f.p.map(v3)),rad:f.r,n,a:f.g[0]/n,g1:f.g[1]/n,ap:f.g[2]/n,g2:f.g[3]/n,side:si,src:si});}));
+const inV=p=>Math.abs(p[0]-.1)<1.15&&p[1]<2.3&&p[1]>-1.7;
+['L','R'].forEach((s,si)=>HM.land.F[s].forEach(f0=>{let a0=0,a1=f0.p.length;while(a0<2&&!inV(f0.p[a0]))a0++;while(a1-1>f0.g[3]+1&&!inV(f0.p[a1-1]))a1--;
+  const f={p:f0.p.slice(a0,a1),r:f0.r.slice(a0,a1),g:f0.g.map(x=>Math.max(0,x-a0))};const n=f.p.length-1;paths.push({curve:new THREE.CatmullRomCurve3(f.p.map(v3)),rad:f.r,n,a:f.g[0]/n,g1:f.g[1]/n,ap:f.g[2]/n,g2:f.g[3]/n,side:si,src:si});}));
 const nL=HM.land.F.L.length,nR=HM.land.F.R.length;
 const NP=1500,pU=new Float32Array(NP),pPath=new Uint8Array(NP),pOff=new Float32Array(NP*3),pRnd=new Float32Array(NP),pPrev=new Float32Array(NP*3);
 const hPos=new Float32Array(NP*3),hCol=new Float32Array(NP*3),lPos=new Float32Array(NP*6),lCol=new Float32Array(NP*6);
@@ -518,7 +520,7 @@ function pickAt(e){
 }
 
 /* 크기 */
-function fitD(h,t){const asp=camera.aspect,port=asp<.8;return Math.max((h<420?3.6:(port?3.9:3.25))/t,(port?3.6:2.6)/(t*asp));}
+function fitD(h,t){const asp=camera.aspect,port=asp<.8;return Math.max((h<420?3.6:(port?4.5:3.25))/t,(port?4.3:2.6)/(t*asp));}
 function sizeAll(){
   const w=view.clientWidth,h=view.clientHeight;if(!w||!h)return;
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
@@ -1352,7 +1354,7 @@ function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eO
     const ang=Math.atan2(ty-4-by,tx+side*6-bx);c.beginPath();c.moveTo(tx+side*2,ty-1);c.lineTo(tx+side*6-Math.cos(ang-.5)*11,ty-4-Math.sin(ang-.5)*11);c.lineTo(tx+side*6-Math.cos(ang+.5)*11,ty-4-Math.sin(ang+.5)*11);c.closePath();c.fill();c.restore();
     c.font='600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif';const tw=c.measureText(o.label).width;boxText(c,side<0?Math.max(4,bx-tw-12):Math.min(w-tw-16,bx),by-4,o.label,'600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif',o.col);});}
 function echoLayout(){const narrow=view.clientWidth<760,gap=6;
-  if(narrow){const vb=view.getBoundingClientRect(),bb=document.querySelector('.bar .tools').getBoundingClientRect();echoP.style.bottom=Math.max(12,vb.bottom-bb.top+8)+'px';}else echoP.style.bottom='';
+  echoP.style.bottom='';
   const pw=echoP.clientWidth;
   if(!narrow&&ECHO.tab==='3d'){ECHO.tab='fn';ECHO.mm=false;}
   $('eTab3').hidden=!narrow;[...$('eTabs').children].forEach(b=>b.setAttribute('aria-selected',b.dataset.v===ECHO.tab));
@@ -1433,6 +1435,7 @@ function echoReset(){const d=ECHO.def||['plax'];ECHO.animNext=!!EBcur&&ECHO.on;E
   [...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===ECHO.view));}
 function echoCase(sc){const d=ECHO_DEF[sc.id]||['plax','기본 평가'];ECHO.def=d;const v=EVIEWS.find(q=>q[0]===d[0]);$('eRec').textContent='루틴 단면 · '+v[3]+' — '+d[1];if(ECHO.on)echoReset();}
 $('eReset').addEventListener('click',echoReset);
+$('ePause').addEventListener('click',()=>$('tPause').click());new MutationObserver(()=>$('ePause').setAttribute('aria-pressed',$('tPause').getAttribute('aria-pressed'))).observe($('tPause'),{attributes:true});
 /* LV function: EF / SV / CO, live LV volume, 17-segment wall motion */
 const EDV={hf:185,pedema:165,hcm:85,sbrady:135,chb:150,vsd:150,asd:130,avb1:125};
 const SEG_LAD=[1,2,7,8,13,14,17],SEG_RCA=[3,4,9,10,15],SEG_LCX=[5,6,11,12,16];
