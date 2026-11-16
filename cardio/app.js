@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 16';
+const VER='Ver.cardio 17';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -113,12 +113,12 @@ function wOf(x,y,z){
   wt[0]=vent*lvf;wt[1]=vent*(1-lvf);wt[2]=atr*laf;wt[3]=atr*(1-laf);return wt;
 }
 const SU={uC:{value:[0,0,0,0]},uB:{value:[MVc,TVc]},uU:{value:[uLV,uRV]},uL:{value:[LLV,LRV]},uA:{value:[LAc,RAc]},
-  uAV:{value:new THREE.Vector4(nav.x,nav.y,nav.z,dav)},uQv:{value:new THREE.Vector2()},uT:{value:0},uIsc:{value:new THREE.Vector4(0,0,0,0)},uIscK:{value:.95},
+  uAV:{value:new THREE.Vector4(nav.x,nav.y,nav.z,dav)},uQv:{value:new THREE.Vector2()},uT:{value:0},uIsc:{value:new THREE.Vector4(0,0,0,0)},uIscK:{value:.95},uDil:{value:0},uHcm:{value:0},uSep:{value:new THREE.Vector3(1,0,0)},uHole:{value:new THREE.Vector4(0,0,0,0)},
   uOrg:{value:[new V3(),new V3(),new V3(),new V3()]},uWave:{value:[-9,-9,-9,-9]},uPlat:{value:[0,0,0,0]},uChaos:{value:[0,0,0,0]},
   uHi:{value:new THREE.Vector4()},uDbg:{value:DBG==='w'?1:0},uGlow:{value:1},uDig:{value:0},uFlu:{value:0},uPulse:{value:0},uHi2:{value:new THREE.Vector4()},uEcho:{value:0},uEchoFlip:{value:0}};
 const VS_DECL=`
 attribute vec4 aW;
-uniform float uC[4];uniform vec3 uB[2];uniform vec3 uU[2];uniform float uL[2];uniform vec3 uA[2];uniform vec4 uAV;uniform vec2 uQv;uniform float uT;uniform vec4 uIsc;uniform float uIscK;uniform float uEndo;
+uniform float uC[4];uniform vec3 uB[2];uniform vec3 uU[2];uniform float uL[2];uniform vec3 uA[2];uniform vec4 uAV;uniform vec2 uQv;uniform float uT;uniform vec4 uIsc;uniform float uIscK;uniform float uEndo;uniform float uDil;uniform float uHcm;uniform vec3 uSep;
 varying vec3 vP;varying vec4 vW;
 vec3 hdeform(vec3 p,vec4 w,vec3 n){
   vec3 d=vec3(0.);
@@ -127,12 +127,16 @@ vec3 hdeform(vec3 p,vec4 w,vec3 n){
     float c=uC[k]*(1.-uIscK*isc);
     vec3 rel=p-uB[k];float s=dot(rel,uU[k]);vec3 rv=rel-s*uU[k];
     float en=uEndo<0.?0.:max(uEndo,smoothstep(-.35,.35,-dot(n,normalize(rv+vec3(1e-4)))));
+    if(k==0){float ax=clamp(s/uL[0],0.,1.);rv*=1.+uDil*smoothstep(0.,.35,ax);
+      float sw=smoothstep(.2,.85,dot(normalize(rv+vec3(1e-4)),uSep));}
     float kr=mix(.06,.27,en);
     float a=.2*c*clamp(s/uL[k],0.,1.);
     vec3 r2=rv*(1.-kr*c);r2=r2*cos(a)+cross(uU[k],r2)*sin(a);
     float s2=s+(uL[k]-s)*.12*c;
     d+=(k==0?w.x:w.y)*(uB[k]+uU[k]*s2+r2-p);
   }
+  if(uHcm>0.){vec3 rl=p-uB[0];float s0=dot(rl,uU[0]);vec3 r0=rl-s0*uU[0];vec3 r0n=normalize(r0+vec3(1e-4));float ax0=clamp(s0/uL[0],0.,1.);
+    float sw=smoothstep(.15,.8,dot(r0n,uSep)),fc=smoothstep(.05,.45,dot(n,-r0n));d+=-r0n*uHcm*.27*sw*fc*smoothstep(.02,.22,ax0)*(1.-smoothstep(.7,.95,ax0))*(1.-.35*uC[0]);}
   float fo=(1.-smoothstep(0.,1.3,-(dot(p,uAV.xyz)-uAV.w)))*.8;
   d+=w.z*(-(p-uA[0])*.11*uC[2]+uU[0]*uL[0]*.12*uC[0]*fo);
   d+=w.w*(-(p-uA[1])*.11*uC[3]+uU[1]*uL[1]*.12*uC[1]*fo);
@@ -141,10 +145,11 @@ vec3 hdeform(vec3 p,vec4 w,vec3 n){
   return p+d;
 }`;
 const FS_DECL=`
-uniform vec3 uOrg[4];uniform float uWave[4];uniform float uPlat[4];uniform float uChaos[4];uniform float uT;uniform float uOp;uniform vec4 uHi;uniform vec4 uIsc;uniform float uDbg;uniform float uGlow;uniform vec4 uDye;uniform float uStop;uniform vec4 uJo;uniform vec3 uTint;uniform float uDig;uniform float uFlu;uniform float uPulse;uniform float uCorF;uniform vec4 uHi2;uniform float uVes;
+uniform vec4 uHole;uniform vec3 uOrg[4];uniform float uWave[4];uniform float uPlat[4];uniform float uChaos[4];uniform float uT;uniform float uOp;uniform vec4 uHi;uniform vec4 uIsc;uniform float uDbg;uniform float uGlow;uniform vec4 uDye;uniform float uStop;uniform vec4 uJo;uniform vec3 uTint;uniform float uDig;uniform float uFlu;uniform float uPulse;uniform float uCorF;uniform vec4 uHi2;uniform float uVes;
 varying vec3 vP;varying vec4 vW;`;
 const FS_BODY=`#include <emissivemap_fragment>
 {
+  if(uHole.w>0.&&distance(vP,uHole.xyz)<uHole.w)discard;
   float gl=0.,pl=0.,ch=0.;
   for(int k=0;k<4;k++){float w=k==0?vW.x:(k==1?vW.y:(k==2?vW.z:vW.w));float dd0=distance(vP,uOrg[k]);
     gl+=w*exp(-pow((dd0-uWave[k])/.11,2.))*step(-1.,uWave[k]);
@@ -892,7 +897,7 @@ function drawEx(now){
   c.restore();
 }
 const CAV=`<section><h3>실측 기록 주의 · Real-data caveats</h3><ul>
-<li>실측 기록은 시나리오 설명과 다를 수 있습니다. 예: 하벽 STEMI 기록은 HR 90 안팎으로, 설명의 서맥과 다릅니다. 파형은 실제 기록이고, 설명은 교과서적 대표 소견입니다.</li>
+<li>실측 기록은 시나리오 설명과 다를 수 있습니다. 예: 전벽 STEMI 기록은 초급성기가 아니라 급성~아급성 경과입니다. 파형은 실제 기록이고, 설명은 교과서적 대표 소견입니다.</li>
 <li>초급성 STEMI, Mobitz II, VT, Torsades, VF, PEA, 무수축, 고칼륨혈증, 소아 질환은 적합한 공개 기록이 없어 합성 파형만 제공합니다.</li>
 <li>실측 ECG는 시술 전 기록 그대로입니다. 재관류 후 ST 변화는 반영되지 않습니다.</li>
 <li>완전 방실차단 실측은 P파 위치를 추정한 값입니다. Mobitz I은 P파 자동 검출이 불안정해 실측에서 제외했습니다.</li>
@@ -1139,6 +1144,9 @@ $('procPop').addEventListener('click',e=>{const b=e.target.closest('button');if(
 $('flu').addEventListener('change',e=>{proc.flu=e.target.checked;if(proc.mode&&proc.mode!=='cabg')setFlu(proc.flu);});
 
 function extrasScenario(sc){echoCase(sc);
+  {const f=sc.flags||{};SU.uDil.value=f.hf?.17:0;SU.uHcm.value=f.hcm?1:0;
+   const sp=v3(LD.lvSept).sub(MVc);sp.addScaledVector(uLV,-sp.dot(uLV)).normalize();SU.uSep.value.copy(sp);
+   const H=f.shunt==='vsd'||f.shunt==='tof'?vsdP:f.shunt==='asd'?iaP:null;SU.uHole.value.set(H?H.x:0,H?H.y:0,H?H.z:0,H?(f.shunt==='asd'?.2:.17):0);}
   const f=sc.flags||{};
   if(proc.mode||proc.reperf){procClear();proc.reperf=false;}sim.stK=1;setStops();
   if(shuntOn!==(f.shunt||null)){shuntOn=f.shunt||null;for(let i=0;i<NP;i++){if(paths[pPath[i]].sh||shuntOn){pPath[i]=pick(i%2);pU[i]=Math.random();}}pInit=false;}
@@ -1323,6 +1331,9 @@ function lesionTargets(){const f=sim.sc.flags||{},out=[],Wp=wallSample(),{P,D,N,
   const sep=v3(LD.lvSept).lerp(v3(LD.rvSept),.5);
   if(f.lbb)near(v=>v.distanceTo(sep)<.5,'중격 비동시성','#b48cff');
   if(f.hcm)near(v=>v.distanceTo(sep)<.5,'중격 비후 · 과운동','#57d3e6');
+  if(f.shunt==='vsd'||f.shunt==='tof')near(v=>v.distanceTo(vsdP)<.42,'VSD 결손','#ffcf70');
+  if(f.shunt==='asd')near(v=>v.distanceTo(iaP)<.45,'ASD 결손','#ffcf70');
+  if(f.hf)near(v=>v.distanceTo(LVap)<.7,'좌심실 확장 · 운동저하','#f2b84b');
   return out;}
 function boxText(c,x,y,t,font,col,align){c.font=font;const w=c.measureText(t).width,bx=align==='r'?x-w-12:x;c.fillStyle='rgba(4,8,13,.78)';rrect(c,bx,y-14,w+12,20,5);c.fill();c.fillStyle=col;c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,bx+6,y);return w+12;}
 function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eOv.width=Math.round(w*dpr);eOv.height=Math.round(h*dpr);const c=eOv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
@@ -1389,7 +1400,7 @@ const ECHO_DEF={nsr:['plax','기본 선별: 심실 크기·판막·벽 두께'],
   chb:['a4c','심실 기능, 심방·심실 수축 해리'],lbbb:['psax-pm','중격 비동시성 (M-mode로 septal flash)'],rbbb:['a4c','우심실 크기 (폐색전증 감별)'],pvc:['plax','M-mode로 조기수축과 박출 감소'],
   isch:['psax-pm','국소 벽운동 (17분절)'],stA:['a4c','LAD 영역: 심첨·중격·전벽 벽운동'],stI:['psax-pm','RCA 영역: 하벽·하중격 벽운동'],hk:['plax','기본 평가'],
   hf:['plax','LVEF·좌심실 크기'],pedema:['a4c','LVEF·판막 역류 원인'],vf:['sc4c','심정지: 맥박 확인 10초 안에 늑골하로'],pea:['sc4c','PEA: 심장 움직임·심낭삼출·우심실 확장'],asys:['sc4c','진짜 무수축인지 확인'],
-  vsd:['psax-mv','결손 위치 확인'],asd:['sc4c','심방중격 결손 (늑골하에서 잘 보임)'],pda:['psax-av','동맥관 (고위 단축)'],tof:['plax','대동맥 기승·VSD'],hcm:['plax','중격 두께·SAM (M-mode)'],kd:['psax-av','관상동맥 기시부·동맥류']};
+  vsd:['a4c','근성부 심실중격 결손 · 좌→우 단락 제트'],asd:['sc4c','심방중격 결손 (늑골하에서 잘 보임)'],pda:['psax-av','동맥관 (고위 단축)'],tof:['plax','대동맥 기승·VSD'],hcm:['plax','중격 두께·SAM (M-mode)'],kd:['psax-av','관상동맥 기시부·동맥류']};
 function echoReset(){const d=ECHO.def||['plax'];ECHO.animNext=!!EBcur&&ECHO.on;ECHO.view=d[0];ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(ECHO.view);aimCursor();ECHO.key='';
   [...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===ECHO.view));}
 function echoCase(sc){const d=ECHO_DEF[sc.id]||['plax','기본 평가'];ECHO.def=d;const v=EVIEWS.find(q=>q[0]===d[0]);$('eRec').textContent='루틴 단면 · '+v[3]+' — '+d[1];if(ECHO.on)echoReset();}
