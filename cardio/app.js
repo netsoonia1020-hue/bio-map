@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 22';
+const VER='Ver.cardio 23';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1369,7 +1369,7 @@ function echoLayout(){const narrow=view.clientWidth<760,gap=6;
   if(land){const ratio=WD/DMAX,hh=$('eHead').offsetHeight,room=echoP.clientHeight-hh-8;if(ECHO.tab==='3d')ECHO.tab='';
     if(ECHO.tab==='mm')echoM.style.height=Math.min(130,Math.max(90,room-$('eTabs').offsetHeight-$('eRec').offsetHeight-16))+'px';
     let sh=Math.min(room,echoP.clientWidth*.56/ratio);sh=Math.max(100,sh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();return;}
-  const ratio=WD/DMAX,base=$('eHead').offsetHeight+$('eTabs').offsetHeight+$('eRec').offsetHeight+gap*5,room=echoP.clientHeight-base-2;
+  const ratio=WD/DMAX,base=$('eHead').offsetHeight+$('eTabs').offsetHeight+$('eRec').offsetHeight+gap*5+($('eAdj').style.display==='none'?0:$('eAdj').offsetHeight+gap),room=echoP.clientHeight-base-2;
   let sh,lowH=0;
   if(ECHO.tab==='fn'){lowH=$('eFunc').offsetHeight;sh=Math.min(pw/ratio,room-lowH);}
   else if(ECHO.tab==='mm'||ECHO.tab==='3d'){const minLow=ECHO.tab==='mm'?100:140,maxLow=ECHO.tab==='mm'?(narrow?170:210):900;sh=Math.min(pw/ratio,room*(ECHO.tab==='3d'?.5:.56));lowH=clamp(room-sh,minLow,maxLow);sh=Math.min(pw/ratio,room-lowH);
