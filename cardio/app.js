@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 11';
+const VER='Ver.cardio 12';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1170,7 +1170,7 @@ function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360
   camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
 $('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
 /* ───────────── 9. 심초음파 (2D echo + M-mode) ───────────── */
-const ECHO={pip:true,on:false,view:'plax',tilt:0,rot:0,mm:true,cur:0,lastCol:-1,key:''};
+const ECHO={tab:'fn',adj:false,on:false,view:'plax',tilt:0,rot:0,mm:false,cur:0,lastCol:-1,key:''};
 const RTW=448,RTH=356,MW=600,MH=256,DMAX=3.9,ANG=.68,WD=2*DMAX*Math.sin(ANG),EWIN=4;
 const rtE=new THREE.WebGLRenderTarget(RTW,RTH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
 const rtM=new THREE.WebGLRenderTarget(MW,MH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:false});
@@ -1252,7 +1252,7 @@ const vis=new Map();
 function solo(list){heart.traverse(o=>{if(o!==heart){vis.set(o,o.visible);o.visible=false;}});list.forEach(o=>{let p=o;while(p&&p!==heart){p.visible=true;p=p.parent;}});}
 function unsolo(){vis.forEach((v,o)=>{o.visible=v;});vis.clear();}
 function echoPass(){
-  const key=ECHO.view+'|'+ECHO.tilt+'|'+ECHO.rot;viewBasis(ECHO.view);setupEchoCam();if(key!==ECHO.key){ECHO.key=key;buildFan();drawEchoOv();}
+  const key=ECHO.view+'|'+ECHO.tilt+'|'+ECHO.rot+'|'+sim.sc.id+'|'+(proc.reperf?1:0)+'|'+Math.round(SU.uIsc.value.w*10);viewBasis(ECHO.view);setupEchoCam();if(key!==ECHO.key){ECHO.key=key;buildFan();drawEchoOv();}
   const bg=scene.background;scene.background=null;const list=[wallF,wallB].concat(inner.slice(0,4));
   solo(list);const dw=list.map(m=>m.material.depthWrite);list.forEach(m=>{m.material.depthWrite=true;});
   SU.uEcho.value=1;renderer.clippingPlanes=[ePlane];renderer.setRenderTarget(rtE);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(scene,eCam);
@@ -1277,31 +1277,50 @@ function echoRender(real){
   renderer.setViewport(0,0,W,H);renderer.setScissor(0,0,W,H);renderer.clear();
   if(m){renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);}
   let s=rectOf(echoS);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(dScene,qCam);
-  if(!m&&ECHO.pip){const q=rectOf($('ePip'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=2.1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
-  if(ECHO.mm){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
+  if(!m&&ECHO.tab==='3d'){const q=rectOf($('e3D'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=2.1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
+  if(ECHO.mm&&ECHO.tab==='mm'){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
   renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
   lvTick(real);
   if(ECHO.mm){const w=eEcg.clientWidth,h=eEcg.clientHeight;if(eEcg.width!==Math.round(w*dpr)){eEcg.width=Math.round(w*dpr);eEcg.height=Math.round(h*dpr);}
     const ctx=eEcg.getContext('2d');ex=ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);trace(buf[1],0,h*.62,w,EWIN,h*.32,'#6ff09a',1.5);ex=ecgCtx;}
 }
+let wallS=null;function wallSample(){if(wallS)return wallS;const p=gWall.attributes.position,o=[];for(let k=0;k<p.count;k+=5)o.push(new V3(p.getX(k),p.getY(k),p.getZ(k)));return wallS=o;}
+function lesionTargets(){const f=sim.sc.flags||{},out=[],Wp=wallSample(),{P,D,N,L}=EB,d=new V3();
+  const near=(pred,label,col)=>{let sx=0,sy=0,n=0;for(const v of Wp){if(!pred(v))continue;d.copy(v).sub(P);if(Math.abs(d.dot(N))>.07)continue;sx+=d.dot(L);sy+=d.dot(D);n++;}if(n>4)out.push({x:sx/n,y:sy/n,label,col});};
+  const iw=SU.uIsc.value.w;if(iw>.05){const c=new V3(SU.uIsc.value.x,SU.uIsc.value.y,SU.uIsc.value.z),ak=SU.uIscK.value>.8&&!proc.reperf;near(v=>v.distanceTo(c)<iw*.8,ak?'무운동 (akinesis)':'운동저하 (hypokinesis)',ak?'#ff5d66':'#f2b84b');}
+  const sep=v3(LD.lvSept).lerp(v3(LD.rvSept),.5);
+  if(f.lbb)near(v=>v.distanceTo(sep)<.5,'중격 비동시성','#b48cff');
+  if(f.hcm)near(v=>v.distanceTo(sep)<.5,'중격 비후 · 과운동','#57d3e6');
+  return out;}
+function boxText(c,x,y,t,font,col,align){c.font=font;const w=c.measureText(t).width,bx=align==='r'?x-w-12:x;c.fillStyle='rgba(4,8,13,.78)';rrect(c,bx,y-14,w+12,20,5);c.fill();c.fillStyle=col;c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,bx+6,y);return w+12;}
 function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eOv.width=Math.round(w*dpr);eOv.height=Math.round(h*dpr);const c=eOv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
-  const sx=w/WD,sy=h/DMAX,ox=w/2;c.strokeStyle='rgba(255,230,120,.85)';c.fillStyle='rgba(255,230,120,.95)';c.lineWidth=1;c.font='600 12px "IBM Plex Mono",monospace';
-  for(let cm=1;cm<=15;cm++){const r=cm*.25,x=ox-Math.sin(ANG)*r*sx-4,y=Math.cos(ANG)*r*sy;c.beginPath();c.moveTo(x,y);c.lineTo(x-(cm%5?4:9),y);c.stroke();if(cm%5===0)c.fillText(String(cm),x-28,y+4);}
-  const v=EVIEWS.find(q=>q[0]===ECHO.view);c.textBaseline='alphabetic';c.font='600 13px "IBM Plex Mono",monospace';c.fillStyle='#ffe678';c.fillText(v[1],8,18);c.font='500 12px "IBM Plex Sans KR",sans-serif';c.fillStyle='rgba(236,242,247,.92)';c.fillText(v[3],8+c.measureText(v[1]).width*1.15+8,18);c.fillStyle='rgba(200,214,226,.7)';c.font='500 11px "IBM Plex Sans KR",sans-serif';c.fillText('깊이 16 cm · 1 눈금 = 1 cm',8,h-8);
-  c.fillStyle='#ffe678';c.beginPath();c.moveTo(ox+Math.sin(ANG)*.3*sx+14,10);c.lineTo(ox+Math.sin(ANG)*.3*sx+22,10);c.lineTo(ox+Math.sin(ANG)*.3*sx+18,17);c.closePath();c.fill();}
+  const sx=w/WD,sy=h/DMAX,ox=w/2,fs=w<360?10.5:12;c.strokeStyle='rgba(255,230,120,.85)';c.lineWidth=1;
+  for(let cm=1;cm<=15;cm++){const r=cm*.25,x=ox-Math.sin(ANG)*r*sx-4,y=Math.cos(ANG)*r*sy;c.beginPath();c.moveTo(x,y);c.lineTo(x-(cm%5?4:9),y);c.stroke();if(cm%5===0){c.fillStyle='rgba(255,230,120,.95)';c.font='600 '+fs+'px "IBM Plex Mono",monospace';c.textAlign='right';c.textBaseline='middle';c.fillText(String(cm),x-12,y);}}
+  const v=EVIEWS.find(q=>q[0]===ECHO.view);boxText(c,w-6,20,v[1]+' · '+v[2],'600 '+fs+'px "IBM Plex Sans KR",sans-serif','#ffe678','r');
+  boxText(c,6,h-8,'깊이 16 cm','500 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif','rgba(214,226,236,.9)');
+  c.fillStyle='#ffe678';c.beginPath();const mx=ox+Math.sin(ANG)*.3*sx+14;c.moveTo(mx,8);c.lineTo(mx+8,8);c.lineTo(mx+4,15);c.closePath();c.fill();
+  lesionTargets().forEach(o=>{const th=Math.atan2(o.x,o.y),r=Math.hypot(o.x,o.y);if(Math.abs(th)>ANG||r>DMAX)return;const tx=ox+o.x*sx,ty=o.y*sy,side=tx<ox?-1:1,bx=tx+side*42,by=ty-26;
+    c.save();c.strokeStyle=o.col;c.fillStyle=o.col;c.lineWidth=2.4;c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=4;c.beginPath();c.moveTo(bx,by);c.lineTo(tx+side*6,ty-4);c.stroke();
+    const ang=Math.atan2(ty-4-by,tx+side*6-bx);c.beginPath();c.moveTo(tx+side*2,ty-1);c.lineTo(tx+side*6-Math.cos(ang-.5)*11,ty-4-Math.sin(ang-.5)*11);c.lineTo(tx+side*6-Math.cos(ang+.5)*11,ty-4-Math.sin(ang+.5)*11);c.closePath();c.fill();c.restore();
+    c.font='600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif';const tw=c.measureText(o.label).width;boxText(c,side<0?Math.max(4,bx-tw-12):Math.min(w-tw-16,bx),by-4,o.label,'600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif',o.col);});}
 function echoLayout(){const narrow=view.clientWidth<760,pw=echoP.clientWidth,gap=6;
-  const fixed=$('eHead').offsetHeight+$('eFunc').offsetHeight+$('eTools').offsetHeight+gap*4+(ECHO.mm?gap:0);let avail=echoP.clientHeight-fixed;
-  const mmH=ECHO.mm?Math.max(84,avail*.3):0;const sh=Math.max(120,Math.min(pw/(WD/DMAX),avail-mmH));
-  echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';echoM.style.display=ECHO.mm?'':'none';
-  $('ePip').style.display=narrow&&ECHO.pip?'block':'none';$('eP3').hidden=!narrow;drawEchoOv();drawBull();}
+  if(!narrow&&ECHO.tab==='3d'){ECHO.tab='fn';ECHO.mm=false;}
+  $('eTab3').hidden=!narrow;[...$('eTabs').children].forEach(b=>b.setAttribute('aria-selected',b.dataset.v===ECHO.tab));
+  const low={fn:$('eFunc'),mm:echoM,'3d':$('e3D')};Object.keys(low).forEach(k=>{low[k].style.display=k===ECHO.tab?'':'none';});
+  $('eAdj').style.display=ECHO.adj?'':'none';$('eAdjB').setAttribute('aria-expanded',ECHO.adj);
+  let lowH=ECHO.tab==='fn'?$('eFunc').offsetHeight:ECHO.tab==='mm'?(narrow?170:200):230;
+  if(ECHO.tab==='mm')echoM.style.height=lowH+'px';if(ECHO.tab==='3d')$('e3D').style.height=lowH+'px';
+  const fixed=$('eHead').offsetHeight+$('eTabs').offsetHeight+lowH+$('eTools').offsetHeight+gap*5,avail=echoP.clientHeight-fixed;
+  const sh=Math.max(140,Math.min(pw/(WD/DMAX),avail));echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';drawEchoOv();drawBull();}
+function setTab(t){ECHO.tab=t;ECHO.mm=t==='mm';if(t==='mm'){ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);}echoLayout();}
 function setEcho(on){ECHO.on=on;document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
   if(on){echoReset();ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
   else{renderer.setScissorTest(false);sizeAll();}}
 $('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));
 EVIEWS.forEach(([k,ab,sh,nm])=>{const b=document.createElement('button');b.type='button';b.dataset.v=k;b.innerHTML='<b></b><small></small>';b.firstChild.textContent=ab;b.lastChild.textContent=sh;b.title=nm;b.setAttribute('aria-pressed',k===ECHO.view);
   b.addEventListener('click',()=>{ECHO.view=k;ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(k);aimCursor();[...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x===b));});$('eView').appendChild(b);});
-$('eMM').addEventListener('click',()=>{ECHO.mm=!ECHO.mm;$('eMM').setAttribute('aria-pressed',ECHO.mm);echoLayout();});
-$('eP3').addEventListener('click',()=>{ECHO.pip=!ECHO.pip;$('eP3').setAttribute('aria-pressed',ECHO.pip);echoLayout();});
+$('eTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTab(b.dataset.v);});
+$('eAdjB').addEventListener('click',()=>{ECHO.adj=!ECHO.adj;echoLayout();});
 /* routine view per case + reset */
 const ECHO_DEF={nsr:['plax','기본 선별: 심실 크기·판막·벽 두께'],stach:['plax','빈맥 원인 선별: 수축력·심낭삼출'],af:['a4c','심방 크기·판막, 수축 불규칙'],afl:['a4c','심방 크기·판막'],svt:['plax','구조적 심질환 선별'],
   vt:['psax-pm','벽운동·경색 흉터 (VT 기질)'],tdp:['plax','전반 수축 평가'],sbrady:['plax','기본 평가'],junc:['plax','기본 평가'],avb1:['plax','기본 평가'],wb:['plax','기본 평가'],m2:['plax','기본 평가'],
@@ -1334,12 +1353,12 @@ function wallMotion(){const sc=sim.sc,f=sc.flags||{},s=new Array(18).fill('n');l
   return{s,note};}
 const WMC={n:'#4fd08a',h:'#f2b84b',a:'#ff5d66',d:'#b48cff',k:'#57d3e6',x:'#5d6b78'};
 function drawBull(){const cv=$('eBull'),w=cv.clientWidth,h=cv.clientHeight;if(!w)return;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
-  const wm=wallMotion(),cx=w/2,cy=h/2,R=Math.min(w,h)/2-3,D=Math.PI/180;
+  const wm=wallMotion(),cx=w/2,cy=h/2,R=Math.min(w,h)/2-11,D=Math.PI/180;
   const ring=(r0,r1,n,first,c0)=>{for(let k=0;k<n;k++){const mid=(c0+k*360/n)*D,a0=mid-Math.PI/n,a1=mid+Math.PI/n;c.beginPath();c.arc(cx,cy,r1,-a1,-a0);c.arc(cx,cy,r0,-a0,-a1,true);c.closePath();c.fillStyle=WMC[wm.s[first+k]];c.globalAlpha=.85;c.fill();c.globalAlpha=1;c.strokeStyle='#06101a';c.lineWidth=1.5;c.stroke();
     const tr=(r0+r1)/2;c.fillStyle='#06101a';c.font='600 9px "IBM Plex Mono",monospace';c.textAlign='center';c.textBaseline='middle';c.fillText(String(first+k),cx+Math.cos(mid)*tr,cy-Math.sin(mid)*tr);}};
   ring(R*.72,R,6,1,90);ring(R*.45,R*.72,6,7,90);ring(R*.2,R*.45,4,13,90);
   c.beginPath();c.arc(cx,cy,R*.2,0,Math.PI*2);c.fillStyle=WMC[wm.s[17]];c.fill();c.strokeStyle='#06101a';c.stroke();c.fillStyle='#06101a';c.fillText('17',cx,cy);
-  c.fillStyle='rgba(200,214,226,.8)';c.font='500 9px "IBM Plex Sans KR",sans-serif';c.fillText('전벽',cx,6);c.textAlign='left';c.fillText('중격',0,cy);c.textAlign='right';c.fillText('측벽',w,cy);c.textAlign='center';c.fillText('하벽',cx,h-4);
+  c.fillStyle='rgba(200,214,226,.8)';c.font='500 9px "IBM Plex Sans KR",sans-serif';c.textBaseline='middle';c.fillText('전벽',cx,5);c.textAlign='left';c.fillText('중격',0,cy);c.textAlign='right';c.fillText('측벽',w,cy);c.textAlign='center';c.fillText('하벽',cx,h-4);
   $('eWM').textContent=wm.note;$('eWM').style.color=wm.s.slice(1).some(x=>x==='a')?'#ff8a92':wm.s.slice(1).some(x=>x==='h'||x==='d')?'#f2c46b':wm.s.slice(1).some(x=>x==='x')?'#9fb0bf':'#7fe0a8';}
 const volBuf=[];let lvT=0,lvKey='';
 function lvTick(real){const F=lvFunc(),L=lastLR[0]||{c:0},v=F.edv-F.sv*clamp(L.c/F.mech,0,1);volBuf.push([sim.t,v]);while(volBuf.length&&volBuf[0][0]<sim.t-EWIN)volBuf.shift();
@@ -1348,8 +1367,7 @@ function lvTick(real){const F=lvFunc(),L=lastLR[0]||{c:0},v=F.edv-F.sv*clamp(L.c
   const cv=$('eVol'),w=cv.clientWidth,h=cv.clientHeight;if(!w)return;if(cv.width!==Math.round(w*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
   const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);const vmax=Math.max(F.edv,130)*1.05;
   c.strokeStyle='rgba(120,190,220,.18)';c.lineWidth=1;c.beginPath();c.moveTo(0,h-.5);c.lineTo(w,h-.5);c.stroke();
-  c.beginPath();volBuf.forEach((p,i)=>{const x=(p[0]-(sim.t-EWIN))/EWIN*w,y=h-2-p[1]/vmax*(h-6);i?c.lineTo(x,y):c.moveTo(x,y);});c.strokeStyle='#57d3e6';c.lineWidth=1.6;c.stroke();
-  c.fillStyle='rgba(200,214,226,.75)';c.font='500 9.5px "IBM Plex Sans KR",sans-serif';c.textAlign='left';c.textBaseline='top';c.fillText('좌심실 용적 (mL)',2,1);}
+  c.beginPath();volBuf.forEach((p,i)=>{const x=(p[0]-(sim.t-EWIN))/EWIN*w,y=h-2-p[1]/vmax*(h-4);i?c.lineTo(x,y):c.moveTo(x,y);});c.strokeStyle='#57d3e6';c.lineWidth=1.6;c.stroke();}
 $('eTilt').addEventListener('input',e=>{ECHO.tilt=+e.target.value*Math.PI/180;});$('eRot').addEventListener('input',e=>{ECHO.rot=+e.target.value*Math.PI/180;});
 echoS.addEventListener('pointerdown',e=>{const r=echoS.getBoundingClientRect(),x=((e.clientX-r.left)/r.width-.5)*WD,y=(e.clientY-r.top)/r.height*DMAX;ECHO.cur=clamp(Math.atan2(x,y),-ANG+.03,ANG-.03);});
 new ResizeObserver(()=>{if(ECHO.on)echoLayout();}).observe(echoP);
