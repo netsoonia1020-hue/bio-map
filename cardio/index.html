@@ -168,17 +168,38 @@ dt{color:var(--dim)}dd{margin:0}
 .dock.zoom #ecg{grid-column:1/-1}
 .dock .dhead{grid-row:1}
 .dhead .ttl{font-size:11.5px;color:var(--ink);letter-spacing:.03em;font-weight:500}
-#echoP{position:absolute;z-index:4;top:62px;right:12px;bottom:104px;width:min(52%,620px);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+#echoP{position:absolute;z-index:4;top:62px;right:12px;bottom:104px;width:min(54%,640px);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
 #echoP[hidden]{display:none}
 #echoP>*{pointer-events:auto}
-.ehead{display:flex;gap:6px;align-items:center;padding:4px;flex-wrap:wrap;justify-content:center;max-width:100%}
-.ehead .seg{flex-wrap:wrap;justify-content:center}
+#echoP>.ehead,#echoP>.efunc,#echoP>.etools,#echoS{flex:none}
+.ehead{display:flex;gap:6px;align-items:center;padding:4px;width:100%}
+.evs{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
+.evs::-webkit-scrollbar{display:none}
+.evs button{display:flex;flex-direction:column;align-items:center;flex:none;min-width:66px;padding:5px 8px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--dim);line-height:1.2}
+.evs button b{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.02em}
+.evs button small{font-size:10.5px;white-space:nowrap}
+.evs button[aria-pressed="true"]{background:var(--raise);color:var(--accent);border-color:var(--line2)}
+.eopt{display:flex;gap:4px;flex:none}
+#ePip{position:absolute;right:0;top:0;width:36%;aspect-ratio:1;border:1px solid var(--line2);border-radius:8px;pointer-events:none;display:none;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.efunc{display:flex;gap:12px;align-items:center;padding:8px 10px;width:100%}
+#eBull{position:static!important;inset:auto!important;width:92px!important;height:92px!important;flex:none}
+.efm{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.efrow{display:flex;gap:6px 14px;align-items:baseline;flex-wrap:wrap}
+.efbig b{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.efbig small{font-size:10.5px;color:var(--dim);margin-left:4px}
+.efsm{display:flex;gap:4px 12px;flex-wrap:wrap;font-size:11.5px;color:var(--dim)}
+.efsm b{font-family:var(--mono);color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.efnote{font-size:12px;font-weight:500}
+#eVol{position:static!important;inset:auto!important;width:100%!important;height:34px!important;display:block}
+@media (min-width:981px){body.echo-on .dock{display:none}body.echo-on #echoP{bottom:12px}body.echo-on .bar{right:calc(min(54%,640px) + 24px)}}
 #echoS{position:relative;flex:none;cursor:crosshair}
 #echoM{position:relative;flex:1;min-height:70px;width:100%;border:1px solid rgba(120,190,220,.2);border-radius:6px}
 #echoOv,#echoEcg{position:absolute!important;inset:0;width:100%;height:100%;pointer-events:none}
 #echoEcg{top:auto!important;height:28%!important}
 .etools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;padding:5px 10px;font-size:11.5px;color:var(--dim)}
 .etools label{display:flex;gap:6px;align-items:center}
+.erec{flex-basis:100%;text-align:center;color:var(--accent);font-size:12px;font-weight:500}
+.ehint{flex-basis:100%;text-align:center;font-size:11px}
 .view.echo .hint,.view.echo .phase{display:none}
 @media (max-width:980px){
   html,body{height:auto}
@@ -199,8 +220,10 @@ dt{color:var(--dim)}dd{margin:0}
   .seg button{padding:5px 7px;font-size:11.5px}
   .dhead .src{display:none}
   .view{height:64svh}
-  .view.echo{height:94svh}
-  #echoP{left:12px;right:12px;width:auto;top:58px;bottom:auto;height:64%}
+  .view.echo{height:100svh}
+  #echoP{left:8px;right:8px;width:auto;top:58px;bottom:58px;height:auto}
+  .view.echo .picker{max-width:62%}
+  .efbig b{font-size:26px}
   .etools input[type=range]{width:90px}
 }
 @media (orientation:landscape) and (max-height:560px){
@@ -256,10 +279,11 @@ dt{color:var(--dim)}dd{margin:0}
       <div class="pop glass" id="expl" role="dialog" aria-labelledby="exT"><div class="exh"><b id="exT"></b><button type="button" class="ib" id="exX">닫기</button></div><div id="exTopics"></div><canvas id="exC"></canvas><div id="exD"></div></div>
       <div class="cap glass" id="procCap"></div>
       <div id="echoP" hidden>
-        <div class="ehead glass" id="eHead"><div class="seg" id="eView" role="group" aria-label="초음파 단면" style="padding:0"></div><button type="button" class="ib" id="eMM" aria-pressed="true">M-mode</button></div>
-        <div id="echoS"><canvas id="echoOv"></canvas></div>
+        <div class="ehead glass" id="eHead"><div class="evs" id="eView" role="group" aria-label="초음파 단면"></div><div class="eopt"><button type="button" class="ib" id="eMM" aria-pressed="true">M-mode</button><button type="button" class="ib" id="eP3" aria-pressed="true">3D</button></div></div>
+        <div id="echoS"><canvas id="echoOv"></canvas><div id="ePip"></div></div>
+        <div class="efunc glass" id="eFunc"><canvas id="eBull"></canvas><div class="efm"><div class="efrow"><div class="efbig"><b id="eEF">--</b><small>LVEF %</small></div><div class="efsm"><span>SV <b id="eSV">--</b> mL</span><span>CO <b id="eCO">--</b> L/min</span><span>EDV <b id="eEDV">--</b> mL</span></div></div><div class="efnote" id="eWM"></div><canvas id="eVol"></canvas></div></div>
         <div id="echoM"><canvas id="echoEcg"></canvas></div>
-        <div class="etools glass" id="eTools"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label><span>단면을 탭하면 M-mode 커서 이동</span></div>
+        <div class="etools glass" id="eTools"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label><button type="button" class="ib" id="eReset">단면 초기화</button><span class="erec" id="eRec"></span><span class="ehint">단면을 탭하면 M-mode 커서 이동</span></div>
       </div>
       <div class="call glass" id="call"><b></b><span></span></div>
       <div class="layers glass" id="layers">

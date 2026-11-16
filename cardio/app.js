@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 9';
+const VER='Ver.cardio 11';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -113,18 +113,18 @@ function wOf(x,y,z){
   wt[0]=vent*lvf;wt[1]=vent*(1-lvf);wt[2]=atr*laf;wt[3]=atr*(1-laf);return wt;
 }
 const SU={uC:{value:[0,0,0,0]},uB:{value:[MVc,TVc]},uU:{value:[uLV,uRV]},uL:{value:[LLV,LRV]},uA:{value:[LAc,RAc]},
-  uAV:{value:new THREE.Vector4(nav.x,nav.y,nav.z,dav)},uQv:{value:new THREE.Vector2()},uT:{value:0},uIsc:{value:new THREE.Vector4(0,0,0,0)},
+  uAV:{value:new THREE.Vector4(nav.x,nav.y,nav.z,dav)},uQv:{value:new THREE.Vector2()},uT:{value:0},uIsc:{value:new THREE.Vector4(0,0,0,0)},uIscK:{value:.95},
   uOrg:{value:[new V3(),new V3(),new V3(),new V3()]},uWave:{value:[-9,-9,-9,-9]},uPlat:{value:[0,0,0,0]},uChaos:{value:[0,0,0,0]},
   uHi:{value:new THREE.Vector4()},uDbg:{value:DBG==='w'?1:0},uGlow:{value:1},uDig:{value:0},uFlu:{value:0},uPulse:{value:0},uHi2:{value:new THREE.Vector4()},uEcho:{value:0},uEchoFlip:{value:0}};
 const VS_DECL=`
 attribute vec4 aW;
-uniform float uC[4];uniform vec3 uB[2];uniform vec3 uU[2];uniform float uL[2];uniform vec3 uA[2];uniform vec4 uAV;uniform vec2 uQv;uniform float uT;uniform vec4 uIsc;uniform float uEndo;
+uniform float uC[4];uniform vec3 uB[2];uniform vec3 uU[2];uniform float uL[2];uniform vec3 uA[2];uniform vec4 uAV;uniform vec2 uQv;uniform float uT;uniform vec4 uIsc;uniform float uIscK;uniform float uEndo;
 varying vec3 vP;varying vec4 vW;
 vec3 hdeform(vec3 p,vec4 w,vec3 n){
   vec3 d=vec3(0.);
   float isc=uIsc.w>0.?1.-smoothstep(uIsc.w*.55,uIsc.w,distance(p,uIsc.xyz)):0.;
   for(int k=0;k<2;k++){
-    float c=uC[k]*(1.-.7*isc);
+    float c=uC[k]*(1.-uIscK*isc);
     vec3 rel=p-uB[k];float s=dot(rel,uU[k]);vec3 rv=rel-s*uU[k];
     float en=uEndo<0.?0.:max(uEndo,smoothstep(-.35,.35,-dot(n,normalize(rv+vec3(1e-4)))));
     float kr=mix(.06,.27,en);
@@ -455,7 +455,7 @@ function setScenario(sc){
   sim.loopHz=sim.src==='real'?sim.real.hr/60:1/.32;
   SC.forEach(x=>x.btn.setAttribute('aria-pressed',x===sc));
   const f=sc.flags||{};
-  SU.uIsc.value.set(0,0,0,0);if(f.infarct==='ant'){const p=LD.iscAnt;SU.uIsc.value.set(p[0],p[1],p[2],1.0);}else if(f.infarct==='inf'){const p=LD.iscInf;SU.uIsc.value.set(p[0],p[1],p[2],.85);}
+  SU.uIsc.value.set(0,0,0,0);SU.uIscK.value=.95;if(f.infarct==='ant'){const p=LD.iscAnt;SU.uIsc.value.set(p[0],p[1],p[2],1.0);}else if(f.infarct==='inf'){const p=LD.iscInf;SU.uIsc.value.set(p[0],p[1],p[2],.85);}else if(f.isch){const p=LD.iscAnt;SU.uIsc.value.set(p[0],p[1],p[2],.85);SU.uIscK.value=.5;}
   corMats.lad.color.setHex(f.infarct==='ant'?0x4a3550:0xff7d5e);corMats.rca.color.setHex(f.infarct==='inf'?0x4a3550:0xff7d5e);
   const bp=sc.vit.bp;perfT=bp?clamp(((bp[0]+2*bp[1])/3-25)/60,.08,1):0;
   $('pickName').textContent=sc.name;$('pickDot').style.setProperty('--sev',sevVar[sc.sev]);
@@ -1137,7 +1137,7 @@ $('procPop').addEventListener('click',e=>{const b=e.target.closest('button');if(
   if(p==='reset'){procClear();proc.reperf=false;sim.stK=1;setScenario(sim.sc);}else procStart(p);});
 $('flu').addEventListener('change',e=>{proc.flu=e.target.checked;if(proc.mode&&proc.mode!=='cabg')setFlu(proc.flu);});
 
-function extrasScenario(sc){
+function extrasScenario(sc){echoCase(sc);
   const f=sc.flags||{};
   if(proc.mode||proc.reperf){procClear();proc.reperf=false;}sim.stK=1;setStops();
   if(shuntOn!==(f.shunt||null)){shuntOn=f.shunt||null;for(let i=0;i<NP;i++){if(paths[pPath[i]].sh||shuntOn){pPath[i]=pick(i%2);pU[i]=Math.random();}}pInit=false;}
@@ -1170,7 +1170,7 @@ function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360
   camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
 $('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
 /* ───────────── 9. 심초음파 (2D echo + M-mode) ───────────── */
-const ECHO={on:false,view:'plax',tilt:0,rot:0,mm:true,cur:0,lastCol:-1,key:''};
+const ECHO={pip:true,on:false,view:'plax',tilt:0,rot:0,mm:true,cur:0,lastCol:-1,key:''};
 const RTW=448,RTH=356,MW=600,MH=256,DMAX=3.9,ANG=.68,WD=2*DMAX*Math.sin(ANG),EWIN=4;
 const rtE=new THREE.WebGLRenderTarget(RTW,RTH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
 const rtM=new THREE.WebGLRenderTarget(MW,MH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:false});
@@ -1178,7 +1178,7 @@ const eCam=new THREE.OrthographicCamera(-1,1,1,-1,.05,30),qCam=new THREE.Orthogr
 const ePlane=new THREE.Plane(),ePlane2=new THREE.Plane();
 const LVap=v3(LD.LVapO),lvMid=MVc.clone().addScaledVector(uLV,.45*LLV);
 let EB={P:new V3(),D:new V3(0,0,-1),N:new V3(1,0,0),L:new V3()};
-const EVIEWS=[['plax','PLAX','흉골연 장축'],['psax-av','PSAX-AV','단축 · 대동맥판'],['psax-mv','PSAX-MV','단축 · 승모판'],['psax-pm','PSAX-PM','단축 · 유두근'],['a4c','A4C','심첨 4방'],['a2c','A2C','심첨 2방'],['sc4c','SC','늑골하 4방']];
+const EVIEWS=[['plax','PLAX','흉골연 장축','흉골연 장축'],['psax-av','PSAX-AV','단축·대동맥판','흉골연 단축 · 대동맥판'],['psax-mv','PSAX-MV','단축·승모판','흉골연 단축 · 승모판'],['psax-pm','PSAX-PM','단축·유두근','흉골연 단축 · 유두근'],['a4c','A4C','심첨 4방','심첨 4방'],['a2c','A2C','심첨 2방','심첨 2방'],['sc4c','SC','늑골하 4방','늑골하 4방']];
 function viewBasis(name){
   const perp=(v,a)=>v.clone().addScaledVector(a,-v.dot(a)).normalize();let P,D,N,ref,tg;
   if(name==='plax'||name.indexOf('psax')===0){
@@ -1269,33 +1269,87 @@ function rectOf(el){const c=glc.getBoundingClientRect(),r=el.getBoundingClientRe
 let eAcc=1;
 function echoRender(real){
   const W=view.clientWidth,H=view.clientHeight,cr=glc.getBoundingClientRect(),pr=echoP.getBoundingClientRect(),wide=W>=760;
-  const m=wide?[0,0,Math.max(60,pr.left-cr.left-6),H]:[0,0,W,Math.max(60,cr.bottom-pr.bottom-6)];
+  const m=wide?[0,0,Math.max(60,pr.left-cr.left-6),H]:null;
   EU.uT.value=sim.t;EU.uCur.value=ECHO.cur;EU.uMM.value=ECHO.mm?1:0;
   eAcc+=real;if(eAcc>=1/45||paused){eAcc=0;echoPass();}
   if(ECHO.mm)mmodePass();
   renderer.setScissorTest(true);renderer.setClearColor(0x04080d,1);
   renderer.setViewport(0,0,W,H);renderer.setScissor(0,0,W,H);renderer.clear();
-  renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);
+  if(m){renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);}
   let s=rectOf(echoS);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(dScene,qCam);
+  if(!m&&ECHO.pip){const q=rectOf($('ePip'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=2.1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
   if(ECHO.mm){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
   renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
+  lvTick(real);
   if(ECHO.mm){const w=eEcg.clientWidth,h=eEcg.clientHeight;if(eEcg.width!==Math.round(w*dpr)){eEcg.width=Math.round(w*dpr);eEcg.height=Math.round(h*dpr);}
     const ctx=eEcg.getContext('2d');ex=ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);trace(buf[1],0,h*.62,w,EWIN,h*.32,'#6ff09a',1.5);ex=ecgCtx;}
 }
 function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eOv.width=Math.round(w*dpr);eOv.height=Math.round(h*dpr);const c=eOv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
   const sx=w/WD,sy=h/DMAX,ox=w/2;c.strokeStyle='rgba(255,230,120,.85)';c.fillStyle='rgba(255,230,120,.95)';c.lineWidth=1;c.font='600 12px "IBM Plex Mono",monospace';
   for(let cm=1;cm<=15;cm++){const r=cm*.25,x=ox-Math.sin(ANG)*r*sx-4,y=Math.cos(ANG)*r*sy;c.beginPath();c.moveTo(x,y);c.lineTo(x-(cm%5?4:9),y);c.stroke();if(cm%5===0)c.fillText(String(cm),x-28,y+4);}
-  const v=EVIEWS.find(q=>q[0]===ECHO.view);c.font='600 14px "IBM Plex Sans KR",sans-serif';c.fillText(v[1],10,20);c.font='500 11px "IBM Plex Sans KR",sans-serif';c.fillStyle='rgba(230,238,245,.75)';c.fillText(v[2]+' · 깊이 16 cm',10,38);
+  const v=EVIEWS.find(q=>q[0]===ECHO.view);c.textBaseline='alphabetic';c.font='600 13px "IBM Plex Mono",monospace';c.fillStyle='#ffe678';c.fillText(v[1],8,18);c.font='500 12px "IBM Plex Sans KR",sans-serif';c.fillStyle='rgba(236,242,247,.92)';c.fillText(v[3],8+c.measureText(v[1]).width*1.15+8,18);c.fillStyle='rgba(200,214,226,.7)';c.font='500 11px "IBM Plex Sans KR",sans-serif';c.fillText('깊이 16 cm · 1 눈금 = 1 cm',8,h-8);
   c.fillStyle='#ffe678';c.beginPath();c.moveTo(ox+Math.sin(ANG)*.3*sx+14,10);c.lineTo(ox+Math.sin(ANG)*.3*sx+22,10);c.lineTo(ox+Math.sin(ANG)*.3*sx+18,17);c.closePath();c.fill();}
-function echoLayout(){const ph=echoP.clientHeight-($('eHead').offsetHeight+$('eTools').offsetHeight+18),pw=echoP.clientWidth;
-  let sh=Math.min(pw/(WD/DMAX),ph*(ECHO.mm?.64:1));echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';echoM.style.display=ECHO.mm?'':'none';drawEchoOv();}
-function setEcho(on){ECHO.on=on;$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
-  if(on){ECHO.key='';viewBasis(ECHO.view);aimCursor();ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
+function echoLayout(){const narrow=view.clientWidth<760,pw=echoP.clientWidth,gap=6;
+  const fixed=$('eHead').offsetHeight+$('eFunc').offsetHeight+$('eTools').offsetHeight+gap*4+(ECHO.mm?gap:0);let avail=echoP.clientHeight-fixed;
+  const mmH=ECHO.mm?Math.max(84,avail*.3):0;const sh=Math.max(120,Math.min(pw/(WD/DMAX),avail-mmH));
+  echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';echoM.style.display=ECHO.mm?'':'none';
+  $('ePip').style.display=narrow&&ECHO.pip?'block':'none';$('eP3').hidden=!narrow;drawEchoOv();drawBull();}
+function setEcho(on){ECHO.on=on;document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
+  if(on){echoReset();ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
   else{renderer.setScissorTest(false);sizeAll();}}
 $('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));
-EVIEWS.forEach(([k,ab,nm])=>{const b=document.createElement('button');b.type='button';b.dataset.v=k;b.textContent=ab;b.title=nm;b.setAttribute('aria-pressed',k===ECHO.view);
+EVIEWS.forEach(([k,ab,sh,nm])=>{const b=document.createElement('button');b.type='button';b.dataset.v=k;b.innerHTML='<b></b><small></small>';b.firstChild.textContent=ab;b.lastChild.textContent=sh;b.title=nm;b.setAttribute('aria-pressed',k===ECHO.view);
   b.addEventListener('click',()=>{ECHO.view=k;ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(k);aimCursor();[...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x===b));});$('eView').appendChild(b);});
 $('eMM').addEventListener('click',()=>{ECHO.mm=!ECHO.mm;$('eMM').setAttribute('aria-pressed',ECHO.mm);echoLayout();});
+$('eP3').addEventListener('click',()=>{ECHO.pip=!ECHO.pip;$('eP3').setAttribute('aria-pressed',ECHO.pip);echoLayout();});
+/* routine view per case + reset */
+const ECHO_DEF={nsr:['plax','기본 선별: 심실 크기·판막·벽 두께'],stach:['plax','빈맥 원인 선별: 수축력·심낭삼출'],af:['a4c','심방 크기·판막, 수축 불규칙'],afl:['a4c','심방 크기·판막'],svt:['plax','구조적 심질환 선별'],
+  vt:['psax-pm','벽운동·경색 흉터 (VT 기질)'],tdp:['plax','전반 수축 평가'],sbrady:['plax','기본 평가'],junc:['plax','기본 평가'],avb1:['plax','기본 평가'],wb:['plax','기본 평가'],m2:['plax','기본 평가'],
+  chb:['a4c','심실 기능, 심방·심실 수축 해리'],lbbb:['psax-pm','중격 비동시성 (M-mode로 septal flash)'],rbbb:['a4c','우심실 크기 (폐색전증 감별)'],pvc:['plax','M-mode로 조기수축과 박출 감소'],
+  isch:['psax-pm','국소 벽운동 (17분절)'],stA:['a4c','LAD 영역: 심첨·중격·전벽 벽운동'],stI:['psax-pm','RCA 영역: 하벽·하중격 벽운동'],hk:['plax','기본 평가'],
+  hf:['plax','LVEF·좌심실 크기'],pedema:['a4c','LVEF·판막 역류 원인'],vf:['sc4c','심정지: 맥박 확인 10초 안에 늑골하로'],pea:['sc4c','PEA: 심장 움직임·심낭삼출·우심실 확장'],asys:['sc4c','진짜 무수축인지 확인'],
+  vsd:['psax-mv','결손 위치 확인'],asd:['sc4c','심방중격 결손 (늑골하에서 잘 보임)'],pda:['psax-av','동맥관 (고위 단축)'],tof:['plax','대동맥 기승·VSD'],hcm:['plax','중격 두께·SAM (M-mode)'],kd:['psax-av','관상동맥 기시부·동맥류']};
+function echoReset(){const d=ECHO.def||['plax'];ECHO.view=d[0];ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(ECHO.view);aimCursor();ECHO.key='';
+  [...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===ECHO.view));}
+function echoCase(sc){const d=ECHO_DEF[sc.id]||['plax','기본 평가'];ECHO.def=d;const v=EVIEWS.find(q=>q[0]===d[0]);$('eRec').textContent='루틴 단면 · '+v[3]+' — '+d[1];if(ECHO.on)echoReset();}
+$('eReset').addEventListener('click',echoReset);
+/* LV function: EF / SV / CO, live LV volume, 17-segment wall motion */
+const EDV={hf:185,pedema:165,hcm:85,sbrady:135,chb:150,vsd:150,asd:130,avb1:125};
+const SEG_LAD=[1,2,7,8,13,14,17],SEG_RCA=[3,4,9,10,15],SEG_LCX=[5,6,11,12,16];
+function lvFunc(){const sc=sim.sc,f=sc.flags||{},t=sim.t,vs=sim.V.filter(e=>e.t<=t&&e.t>t-6);
+  const mech=vs.length?vs.reduce((s,e)=>s+e.mech,0)/vs.length:0;let ef=62*mech;const iw=clamp(SU.uIsc.value.w,0,1);if(iw>0)ef*=1-SU.uIscK.value*.32*iw;
+  if(f.hcm)ef=74;if(f.vfib||sc.id==='asys'||!vs.length)ef=0;if(sc.id==='pea')ef=Math.min(ef,4);
+  let hr=0;if(vs.length>1)hr=60*(vs.length-1)/(vs[vs.length-1].t-vs[0].t);const edv=EDV[sc.id]||120,sv=edv*ef/100;
+  return{ef,edv,sv,co:sv*hr/1000,mech:Math.max(.05,vs.length?vs[vs.length-1].mech:1)};}
+function wallMotion(){const sc=sim.sc,f=sc.flags||{},s=new Array(18).fill('n');let note='정상 벽운동 (normokinesis)';const all=v=>{for(let i=1;i<=17;i++)s[i]=v;};
+  if(f.vfib){all('x');note='세동 · 벽운동 평가 불가';}
+  else if(sc.id==='asys'||sc.id==='pea'){all('a');note='전반적 무운동 (global akinesis)';}
+  else if(f.infarct&&!proc.reperf){(f.infarct==='ant'?SEG_LAD:SEG_RCA).forEach(i=>{s[i]='a';});note=f.infarct==='ant'?'LAD 영역 무운동 (anterior akinesis)':'RCA 영역 무운동 (inferior akinesis)';}
+  else if(f.infarct&&proc.reperf){(f.infarct==='ant'?SEG_LAD:SEG_RCA).forEach(i=>{s[i]='h';});note='재관류 후 기절 심근 · 운동저하';}
+  else if(f.isch){SEG_LAD.forEach(i=>{s[i]='h';});note='LAD 영역 운동저하 (hypokinesis)';}
+  else if(f.hf){all('h');note='전반적 운동저하 (global hypokinesis)';}
+  else if(['vt','tdp'].includes(sc.id)){all('h');note='빠른 심박 · 충만 부족, 운동저하';}
+  else if(f.lbb){[2,3,8,9,14].forEach(i=>{s[i]='d';});note='중격 비동시성 (septal dyssynchrony)';}
+  else if(f.hcm){all('k');note='과운동 · 비대칭 중격 비후 (HCM)';}
+  return{s,note};}
+const WMC={n:'#4fd08a',h:'#f2b84b',a:'#ff5d66',d:'#b48cff',k:'#57d3e6',x:'#5d6b78'};
+function drawBull(){const cv=$('eBull'),w=cv.clientWidth,h=cv.clientHeight;if(!w)return;cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
+  const wm=wallMotion(),cx=w/2,cy=h/2,R=Math.min(w,h)/2-3,D=Math.PI/180;
+  const ring=(r0,r1,n,first,c0)=>{for(let k=0;k<n;k++){const mid=(c0+k*360/n)*D,a0=mid-Math.PI/n,a1=mid+Math.PI/n;c.beginPath();c.arc(cx,cy,r1,-a1,-a0);c.arc(cx,cy,r0,-a0,-a1,true);c.closePath();c.fillStyle=WMC[wm.s[first+k]];c.globalAlpha=.85;c.fill();c.globalAlpha=1;c.strokeStyle='#06101a';c.lineWidth=1.5;c.stroke();
+    const tr=(r0+r1)/2;c.fillStyle='#06101a';c.font='600 9px "IBM Plex Mono",monospace';c.textAlign='center';c.textBaseline='middle';c.fillText(String(first+k),cx+Math.cos(mid)*tr,cy-Math.sin(mid)*tr);}};
+  ring(R*.72,R,6,1,90);ring(R*.45,R*.72,6,7,90);ring(R*.2,R*.45,4,13,90);
+  c.beginPath();c.arc(cx,cy,R*.2,0,Math.PI*2);c.fillStyle=WMC[wm.s[17]];c.fill();c.strokeStyle='#06101a';c.stroke();c.fillStyle='#06101a';c.fillText('17',cx,cy);
+  c.fillStyle='rgba(200,214,226,.8)';c.font='500 9px "IBM Plex Sans KR",sans-serif';c.fillText('전벽',cx,6);c.textAlign='left';c.fillText('중격',0,cy);c.textAlign='right';c.fillText('측벽',w,cy);c.textAlign='center';c.fillText('하벽',cx,h-4);
+  $('eWM').textContent=wm.note;$('eWM').style.color=wm.s.slice(1).some(x=>x==='a')?'#ff8a92':wm.s.slice(1).some(x=>x==='h'||x==='d')?'#f2c46b':wm.s.slice(1).some(x=>x==='x')?'#9fb0bf':'#7fe0a8';}
+const volBuf=[];let lvT=0,lvKey='';
+function lvTick(real){const F=lvFunc(),L=lastLR[0]||{c:0},v=F.edv-F.sv*clamp(L.c/F.mech,0,1);volBuf.push([sim.t,v]);while(volBuf.length&&volBuf[0][0]<sim.t-EWIN)volBuf.shift();
+  lvT+=real;if(lvT>.25){lvT=0;const ef=Math.round(F.ef);$('eEF').textContent=ef;$('eEF').style.color=ef>=50?'#7fe0a8':ef>=40?'#f2c46b':'#ff8a92';$('eSV').textContent=Math.round(F.sv);$('eCO').textContent=F.co.toFixed(1);$('eEDV').textContent=Math.round(F.edv);
+    const k=sim.sc.id+'|'+(proc.reperf?1:0);if(k!==lvKey){lvKey=k;drawBull();}}
+  const cv=$('eVol'),w=cv.clientWidth,h=cv.clientHeight;if(!w)return;if(cv.width!==Math.round(w*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);const vmax=Math.max(F.edv,130)*1.05;
+  c.strokeStyle='rgba(120,190,220,.18)';c.lineWidth=1;c.beginPath();c.moveTo(0,h-.5);c.lineTo(w,h-.5);c.stroke();
+  c.beginPath();volBuf.forEach((p,i)=>{const x=(p[0]-(sim.t-EWIN))/EWIN*w,y=h-2-p[1]/vmax*(h-6);i?c.lineTo(x,y):c.moveTo(x,y);});c.strokeStyle='#57d3e6';c.lineWidth=1.6;c.stroke();
+  c.fillStyle='rgba(200,214,226,.75)';c.font='500 9.5px "IBM Plex Sans KR",sans-serif';c.textAlign='left';c.textBaseline='top';c.fillText('좌심실 용적 (mL)',2,1);}
 $('eTilt').addEventListener('input',e=>{ECHO.tilt=+e.target.value*Math.PI/180;});$('eRot').addEventListener('input',e=>{ECHO.rot=+e.target.value*Math.PI/180;});
 echoS.addEventListener('pointerdown',e=>{const r=echoS.getBoundingClientRect(),x=((e.clientX-r.left)/r.width-.5)*WD,y=(e.clientY-r.top)/r.height*DMAX;ECHO.cur=clamp(Math.atan2(x,y),-ANG+.03,ANG-.03);});
 new ResizeObserver(()=>{if(ECHO.on)echoLayout();}).observe(echoP);
