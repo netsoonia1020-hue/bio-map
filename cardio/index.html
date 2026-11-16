@@ -180,6 +180,9 @@ dt{color:var(--dim)}dd{margin:0}
 .evs button small{font-size:10.5px;white-space:nowrap}
 .evs button[aria-pressed="true"]{background:var(--raise);color:var(--accent);border-color:var(--line2)}
 .eopt{display:flex;gap:4px;flex:none}
+.eback{flex:none;display:flex;align-items:center;gap:4px;align-self:stretch;padding:0 12px;border-radius:8px;border:1px solid var(--line2);background:var(--raise);color:var(--ink);font-size:13px;font-weight:600}
+.eback:hover{border-color:var(--accent);color:var(--accent)}
+@media (max-width:420px){.eback span{display:none}.eback{padding:0 10px;font-size:16px}}
 #ePip{position:absolute;right:0;top:0;width:36%;aspect-ratio:1;border:1px solid var(--line2);border-radius:8px;pointer-events:none;display:none;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 .efunc{display:flex;gap:12px;align-items:center;padding:8px 10px;width:100%}
 #eBull{position:static!important;inset:auto!important;width:120px!important;height:104px!important;flex:none}
@@ -295,7 +298,7 @@ dt{color:var(--dim)}dd{margin:0}
       <div class="pop glass" id="expl" role="dialog" aria-labelledby="exT"><div class="exh"><b id="exT"></b><button type="button" class="ib" id="exX">닫기</button></div><div id="exTopics"></div><canvas id="exC"></canvas><div id="exD"></div></div>
       <div class="cap glass" id="procCap"></div>
       <div id="echoP" hidden>
-        <div class="ehead glass" id="eHead"><div class="evs" id="eView" role="group" aria-label="초음파 단면"></div></div>
+        <div class="ehead glass" id="eHead"><button type="button" class="eback" id="eBack" aria-label="심초음파 닫고 3D 심장으로">‹ <span>3D 심장</span></button><div class="evs" id="eView" role="group" aria-label="초음파 단면"></div></div>
         <div id="echoS"><canvas id="echoOv"></canvas></div>
         <div class="etabs" id="eTabs" role="tablist" aria-label="초음파 아래 화면"><button type="button" role="tab" data-v="fn" aria-selected="true">박출 · 벽운동</button><button type="button" role="tab" data-v="mm" aria-selected="false">M-mode</button><button type="button" role="tab" data-v="3d" aria-selected="false" id="eTab3">3D 심장</button></div>
         <div class="efunc glass" id="eFunc"><canvas id="eBull"></canvas><div class="efm"><div class="efrow"><div class="efbig"><b id="eEF">--</b><small>LVEF %</small></div><div class="efsm"><span>SV <b id="eSV">--</b> mL</span><span>CO <b id="eCO">--</b> L/min</span><span>EDV <b id="eEDV">--</b> mL</span></div></div><div class="efnote" id="eWM"></div><div class="evl">좌심실 용적 (mL)</div><canvas id="eVol"></canvas></div></div>
