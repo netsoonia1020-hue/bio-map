@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 26';
+const VER='Ver.cardio 27';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1359,7 +1359,7 @@ function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eO
     c.save();c.strokeStyle=o.col;c.fillStyle=o.col;c.lineWidth=2.4;c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=4;c.beginPath();c.moveTo(bx,by);c.lineTo(tx+side*6,ty-4);c.stroke();
     const ang=Math.atan2(ty-4-by,tx+side*6-bx);c.beginPath();c.moveTo(tx+side*2,ty-1);c.lineTo(tx+side*6-Math.cos(ang-.5)*11,ty-4-Math.sin(ang-.5)*11);c.lineTo(tx+side*6-Math.cos(ang+.5)*11,ty-4-Math.sin(ang+.5)*11);c.closePath();c.fill();c.restore();
     c.font='600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif';const tw=c.measureText(o.label).width;boxText(c,side<0?Math.max(4,bx-tw-12):Math.min(w-tw-16,bx),by-4,o.label,'600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif',o.col);});}
-function echoLayout(){const narrow=view.clientWidth<760,gap=6;
+function echoLayout(){const narrow=view.clientWidth<760,gap=6;document.body.classList.toggle('enarrow',narrow);
   echoP.style.bottom='';
   const pw=echoP.clientWidth;
   if(!narrow&&ECHO.tab==='3d'){ECHO.tab='fn';ECHO.mm=false;}
@@ -1367,17 +1367,25 @@ function echoLayout(){const narrow=view.clientWidth<760,gap=6;
   const low={fn:$('eFunc'),mm:echoM,'3d':$('e3D')};if(!low[ECHO.tab])ECHO.tab='';Object.keys(low).forEach(k=>{low[k].style.display=k===ECHO.tab?'':'none';});
   $('eAdj').style.display=ECHO.adj?'':'none';$('eAdjB').setAttribute('aria-expanded',ECHO.adj);
   const land=innerHeight<=560&&innerWidth>innerHeight&&!narrow;
+  if(land)echoP.classList.remove('ewide');
   if(land){echoS.classList.remove('btn-side','btn-below');echoS.style.marginBottom='';const ratio=WD/DMAX,hh=$('eHead').offsetHeight,room=echoP.clientHeight-hh-8;if(ECHO.tab==='3d')ECHO.tab='';
     if(ECHO.tab==='mm')echoM.style.height=Math.min(130,Math.max(90,room-$('eTabs').offsetHeight-$('eRec').offsetHeight-16))+'px';
     let sh=Math.min(room,echoP.clientWidth*.56/ratio);sh=Math.max(100,sh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();return;}
+  {const ratio=WD/DMAX,H=echoP.clientHeight,top=$('eHead').offsetHeight+$('eRec').offsetHeight+gap*2,lowEst=ECHO.tab==='fn'?Math.max(110,$('eFunc').offsetHeight):ECHO.tab==='mm'?170:0;
+   const colW=clamp(pw*.44,240,340),s0=Math.min(pw/ratio,H-top-44-lowEst-gap*3),stackSh=(pw-s0*ratio)/2>=92&&s0>=130?s0:Math.min(pw/ratio,H-top-44-lowEst-52-gap*3),wideSh=Math.min((pw-colW-10)/ratio,H-top-48-gap);
+   const wide=!narrow&&ECHO.tab!=='3d'&&wideSh>stackSh*1.12;echoP.classList.toggle('ewide',wide);
+   if(wide){echoS.classList.remove('btn-side');echoS.classList.add('btn-below');echoS.style.marginBottom='42px';
+     const sh=Math.max(100,wideSh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';echoP.style.gridTemplateColumns=(sh*ratio)+'px minmax(0,1fr)';
+     if(ECHO.tab==='mm')echoM.style.height=clamp(H-top-$('eTabs').offsetHeight-($('eAdj').style.display==='none'?0:$('eAdj').offsetHeight+gap)-gap*2-4,110,260)+'px';
+     drawEchoOv();drawBull();return;}
+   echoP.style.gridTemplateColumns='';}
   const ratio=WD/DMAX,base=$('eHead').offsetHeight+$('eTabs').offsetHeight+$('eRec').offsetHeight+gap*5+($('eAdj').style.display==='none'?0:$('eAdj').offsetHeight+gap),room=echoP.clientHeight-base-2;
-  let sh,lowH=0;
-  const BR=52,rm=room-BR;
-  if(ECHO.tab==='fn'){lowH=$('eFunc').offsetHeight;sh=Math.min(pw/ratio,rm-lowH);}
-  else if(ECHO.tab==='mm'||ECHO.tab==='3d'){const minLow=ECHO.tab==='mm'?100:Math.min(200,rm*.42),maxLow=ECHO.tab==='mm'?(narrow?170:210):900;sh=Math.min(pw/ratio,rm*(ECHO.tab==='3d'?.56:.62));lowH=clamp(rm-sh,minLow,maxLow);sh=Math.min(pw/ratio,rm-lowH);
-    (ECHO.tab==='mm'?echoM:$('e3D')).style.height=lowH+'px';}
-  else sh=Math.min(pw/ratio,rm);
-  sh=Math.max(60,sh);let side=(pw-sh*ratio)/2;const below=side<70;
+  const calc=BR=>{const rm=room-BR;let sh,lowH=0;
+    if(ECHO.tab==='fn'){lowH=$('eFunc').offsetHeight;sh=Math.min(pw/ratio,rm-lowH);}
+    else if(ECHO.tab==='mm'||ECHO.tab==='3d'){const minLow=ECHO.tab==='mm'?100:Math.min(200,rm*.42),maxLow=ECHO.tab==='mm'?(narrow?170:210):900;sh=Math.min(pw/ratio,rm*(ECHO.tab==='3d'?.56:.62));lowH=clamp(rm-sh,minLow,maxLow);sh=Math.min(pw/ratio,rm-lowH);}
+    else sh=Math.min(pw/ratio,rm);return [Math.max(60,sh),lowH];};
+  let [sh,lowH]=calc(0),below=(pw-sh*ratio)/2<92||sh<130;if(below)[sh,lowH]=calc(52);
+  if(ECHO.tab==='mm'||ECHO.tab==='3d')(ECHO.tab==='mm'?echoM:$('e3D')).style.height=lowH+'px';
   echoS.classList.toggle('btn-side',!below);echoS.classList.toggle('btn-below',below);echoS.style.marginBottom=below?'42px':'';
   echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';fitOver();drawEchoOv();drawBull();}
 function fitOver(){const over=echoP.scrollHeight-echoP.clientHeight;if(over<=0||innerHeight<=560&&innerWidth>innerHeight)return;const r=WD/DMAX,h=Math.max(60,echoS.offsetHeight-over-2);echoS.style.height=h+'px';echoS.style.width=(h*r)+'px';}
