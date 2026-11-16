@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 15';
+const VER='Ver.cardio 16';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1277,7 +1277,7 @@ function curBasis(){const tk=ECHO.view+'|'+ECHO.tilt+'|'+ECHO.rot;
   const q=EBcur.q,L=new V3(1,0,0).applyQuaternion(q),D=new V3(0,-1,0).applyQuaternion(q),N=new V3(0,0,1).applyQuaternion(q);EB={P:EBcur.P.clone(),D,N,L,tg:ECHO.tgt.tg};}
 function camSwing(t){let dir=t.N.clone().multiplyScalar(.85).addScaledVector(t.D,-.5).add(new V3(0,.22,0)).normalize();
   const cur=camera.position.clone().sub(controls.target);if(dir.dot(cur)<0)dir=t.N.clone().multiplyScalar(-.85).addScaledVector(t.D,-.5).add(new V3(0,.22,0)).normalize();
-  ECam={d0:cur.clone().normalize(),d1:dir,r:Math.max(cur.length(),view.clientWidth>=760?16:11.5),r0:cur.length(),t0:controls.target.clone(),s:performance.now()};controls.enableDamping=false;userMoved=true;}
+  ECam={d0:cur.clone().normalize(),d1:dir,r:view.clientWidth>=760?Math.max(cur.length(),16):9.8,r0:cur.length(),t0:controls.target.clone(),s:performance.now()};controls.enableDamping=false;userMoved=true;}
 function camStep(){if(!ECam)return;const k=Math.min(1,(performance.now()-ECam.s)/900),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
   const q=new THREE.Quaternion().setFromUnitVectors(ECam.d0,ECam.d1),qi=new THREE.Quaternion().slerp(q,e);
   controls.target.lerpVectors(ECam.t0,TARGET,e);camera.position.copy(controls.target).addScaledVector(ECam.d0.clone().applyQuaternion(qi),ECam.r0+(ECam.r-ECam.r0)*e);camera.lookAt(controls.target);
@@ -1309,7 +1309,7 @@ function echoRender(real){
   renderer.setViewport(0,0,W,H);renderer.setScissor(0,0,W,H);renderer.clear();
   if(m){renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);}
   let s=rectOf(echoS);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(dScene,qCam);
-  if(!m&&ECHO.tab==='3d'){const q=rectOf($('e3D'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=2.1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
+  if(!m&&ECHO.tab==='3d'){const q=rectOf($('e3D'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
   if(ECHO.mm&&ECHO.tab==='mm'){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
   renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
   lvTick(real);drawDoppler(real);
