@@ -214,12 +214,11 @@ dt{color:var(--dim)}dd{margin:0}
 .sbtn{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid rgba(120,190,220,.45);background:rgba(4,10,16,.82);color:#cfe3ee;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .sbtn:hover{border-color:var(--accent);color:#fff}
 .sbtn[aria-pressed="true"],.sbtn[aria-expanded="true"]{color:var(--accent);border-color:var(--accent)}
-#eDop{left:6px;top:6px}
 .sbr{position:absolute;right:6px;bottom:6px;display:flex;gap:5px;z-index:3}
 #echoS .sbr .sbtn{position:static}
-#echoS .eadj{position:absolute;left:6px;right:6px;bottom:42px;z-index:3;margin:0;padding:6px 10px;border:1px solid var(--line2);border-radius:9px;background:rgba(4,10,16,.88);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;font-size:12px;color:var(--dim)}
-#echoS .eadj label{display:flex;gap:6px;align-items:center}
-#echoS .eadj input{width:96px}
+#echoP .eadj{flex:none;margin:0;padding:6px 10px;border:1px solid var(--line2);border-radius:9px;background:rgba(10,18,28,.86);display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;font-size:12px;color:var(--dim)}
+#echoP .eadj label{display:flex;gap:6px;align-items:center}
+#echoP .eadj input{width:110px}
 #eOri .e3r{position:absolute;right:8px;top:8px;pointer-events:auto}
 #echoP>.erec{flex:0 0 auto!important;min-width:0!important}
 .erec{width:100%;flex:none;font-size:11.5px;font-weight:500;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;padding:0 4px}
@@ -231,7 +230,7 @@ dt{color:var(--dim)}dd{margin:0}
 #eOri{position:absolute;z-index:3;pointer-events:none;display:none}
 .pop.on~#eOri,.pop.on~#tags{display:none!important}
 #eOri[hidden]{display:none}
-.ewin{position:absolute;left:8px;top:8px;max-width:calc(100% - 16px);padding:3px 9px;border-radius:7px;background:rgba(4,10,16,.82);border:1px solid var(--line2);color:#ffe678;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ewin{position:absolute;left:8px;top:8px;max-width:calc(100% - 120px);padding:3px 9px;border-radius:7px;background:rgba(4,10,16,.82);border:1px solid var(--line2);color:#ffe678;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #eOri #eCmp{position:absolute!important;inset:auto!important;left:8px!important;bottom:8px!important;width:64px!important;height:64px!important}
 .tight .edrag{display:none}
 .tight #eCmp{width:52px!important;height:52px!important}
@@ -360,11 +359,9 @@ dt{color:var(--dim)}dd{margin:0}
         <div class="ehead glass" id="eHead"><button type="button" class="eback" id="eBack" aria-label="심초음파 닫기">✕ <span>닫기</span></button><div class="evs" id="eView" role="group" aria-label="초음파 단면"></div><button type="button" class="ib ehp" id="ePause" aria-pressed="false">일시정지</button></div>
         <div class="erec" id="eRec" title="눌러서 전체 보기"></div>
         <div id="echoS"><canvas id="eFlow"></canvas><canvas id="echoOv"></canvas>
-          <button type="button" class="sbtn" id="eDop" aria-pressed="true">도플러</button>
-          <div class="sbr"><button type="button" class="sbtn" id="eAdjB" aria-expanded="false">각도</button><button type="button" class="sbtn" id="eReset">↺ 단면</button></div>
-          <div class="eadj" id="eAdj"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label></div>
+          <div class="sbr"><button type="button" class="sbtn" id="eDop" aria-pressed="true">도플러</button><button type="button" class="sbtn" id="eAdjB" aria-expanded="false">각도</button><button type="button" class="sbtn" id="eReset">↺ 단면</button></div>
         </div>
-        <div class="eside" id="eSide"><div class="etabs" id="eTabs" role="tablist" aria-label="초음파 아래 화면"><button type="button" role="tab" data-v="3d" aria-selected="false" id="eTab3">3D 심장</button><button type="button" role="tab" data-v="fn" aria-selected="true">박출 · 벽운동</button><button type="button" role="tab" data-v="mm" aria-selected="false">M-mode</button></div>
+        <div class="eside" id="eSide"><div class="eadj" id="eAdj"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label></div><div class="etabs" id="eTabs" role="tablist" aria-label="초음파 아래 화면"><button type="button" role="tab" data-v="3d" aria-selected="false" id="eTab3">3D 심장</button><button type="button" role="tab" data-v="fn" aria-selected="true">박출 · 벽운동</button><button type="button" role="tab" data-v="mm" aria-selected="false">M-mode</button></div>
         <div class="efunc glass" id="eFunc"><canvas id="eBull"></canvas><div class="efm"><div class="efrow"><div class="efbig"><b id="eEF">--</b><small>LVEF %</small></div><div class="efsm"><span>SV <b id="eSV">--</b> mL</span><span>CO <b id="eCO">--</b> L/min</span><span>EDV <b id="eEDV">--</b> mL</span></div></div><div class="efnote" id="eWM"></div><div class="evl">좌심실 용적 (mL)</div><canvas id="eVol"></canvas></div></div>
         <div id="echoM"><canvas id="echoEcg"></canvas><span class="mmhint">단면을 탭하면 커서 이동</span></div>
         <div id="e3D"></div></div>
