@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 13';
+const VER='Ver.cardio 14';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -513,11 +513,12 @@ function pickAt(e){
 }
 
 /* 크기 */
+function fitD(h,t){const asp=camera.aspect,port=asp<.8;return Math.max((h<420?3.6:(port?3.9:3.25))/t,(port?3.6:2.6)/(t*asp));}
 function sizeAll(){
   const w=view.clientWidth,h=view.clientHeight;if(!w||!h)return;
   renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
   if(composer){composer.setPixelRatio(renderer.getPixelRatio());composer.setSize(w,h);}
-  if(!userMoved){const t=Math.tan(camera.fov*Math.PI/360),d=Math.max((h<420?3.6:3.25)/t,2.6/(t*camera.aspect));camera.position.sub(TARGET).setLength(d).add(TARGET);}
+  if(!userMoved){const t=Math.tan(camera.fov*Math.PI/360),d=fitD(h,t);camera.position.sub(TARGET).setLength(d).add(TARGET);}
   dpr=Math.min(devicePixelRatio||1,3);eW=ecgC.clientWidth;eH=ecgC.clientHeight;ecgC.width=Math.max(1,eW*dpr);ecgC.height=Math.max(1,eH*dpr);
 }
 new ResizeObserver(sizeAll).observe(view);new ResizeObserver(sizeAll).observe(ecgC);
@@ -1166,7 +1167,7 @@ function extrasFrame(real,dt,t,L,R,now){lastLR=[L,R];
 }
 
 const DIR0=new V3(1.2,.9,11).sub(TARGET).normalize();let camAnim=null;
-function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360),d=Math.max((h<420?3.6:3.25)/t,2.6/(t*camera.aspect));
+function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360),d=fitD(h,t);
   camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
 $('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
 /* ───────────── 9. 심초음파 (2D echo + M-mode) ───────────── */
