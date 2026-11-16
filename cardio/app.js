@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 8';
+const VER='Ver.cardio 9';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -115,7 +115,7 @@ function wOf(x,y,z){
 const SU={uC:{value:[0,0,0,0]},uB:{value:[MVc,TVc]},uU:{value:[uLV,uRV]},uL:{value:[LLV,LRV]},uA:{value:[LAc,RAc]},
   uAV:{value:new THREE.Vector4(nav.x,nav.y,nav.z,dav)},uQv:{value:new THREE.Vector2()},uT:{value:0},uIsc:{value:new THREE.Vector4(0,0,0,0)},
   uOrg:{value:[new V3(),new V3(),new V3(),new V3()]},uWave:{value:[-9,-9,-9,-9]},uPlat:{value:[0,0,0,0]},uChaos:{value:[0,0,0,0]},
-  uHi:{value:new THREE.Vector4()},uDbg:{value:DBG==='w'?1:0},uGlow:{value:1},uDig:{value:0},uFlu:{value:0},uPulse:{value:0},uHi2:{value:new THREE.Vector4()}};
+  uHi:{value:new THREE.Vector4()},uDbg:{value:DBG==='w'?1:0},uGlow:{value:1},uDig:{value:0},uFlu:{value:0},uPulse:{value:0},uHi2:{value:new THREE.Vector4()},uEcho:{value:0},uEchoFlip:{value:0}};
 const VS_DECL=`
 attribute vec4 aW;
 uniform float uC[4];uniform vec3 uB[2];uniform vec3 uU[2];uniform float uL[2];uniform vec3 uA[2];uniform vec4 uAV;uniform vec2 uQv;uniform float uT;uniform vec4 uIsc;uniform float uEndo;
@@ -182,7 +182,7 @@ const FS_BODY=`#include <emissivemap_fragment>
   if(uDbg>.5){diffuseColor.rgb=vW.xyz+vW.w*vec3(1.,1.,0.);diffuseColor.a=1.;}
 }`;
 function inject(mat,opt){
-  opt=opt||{};const own={uOp:opt.op||{value:1},uEndo:{value:opt.epi?-1:(opt.endo?1:0)},uDye:{value:new THREE.Vector4()},uStop:{value:99},uJo:{value:new THREE.Vector4(0,0,0,-1)},uTint:{value:new V3(mat.color.r,mat.color.g,mat.color.b)},uCorF:{value:opt.cor?1:0},uVes:{value:opt.ves?1:0}};
+  opt=opt||{};const own={uOp:opt.op||{value:1},uEndo:{value:opt.epi?-1:(opt.endo?1:0)},uDye:{value:new THREE.Vector4()},uStop:{value:99},uJo:{value:new THREE.Vector4(0,0,0,-1)},uTint:{value:new V3(mat.color.r,mat.color.g,mat.color.b)},uCorF:{value:opt.cor?1:0},uVes:{value:opt.ves?1:0},uEchoI:{value:opt.valve?1.:(opt.lit===false?.9:.78)},uEchoBS:{value:mat.side===THREE.BackSide?1:0}};
   if(opt.valve)Object.assign(own,{uVc:{value:opt.valve.c},uVu:{value:opt.valve.u},uVo:opt.valve.o,uVm:{value:opt.valve.m}});
   mat.userData.own=own;
   mat.onBeforeCompile=sh=>{
@@ -192,6 +192,7 @@ function inject(mat,opt){
     if(opt.valve)body+='{vec3 rl=transformed-uVc;float dp=dot(rl,uVu);vec3 rr=rl-dp*uVu;float pf=uVm>.5?1.:smoothstep(0.,.16,dp)*(1.-smoothstep(.3,.62,dp));transformed+=uVm>.5?rr*uVo*.16:-rr*(1.-uVo)*.5*pf;}';
     sh.vertexShader=vs.replace('#include <begin_vertex>',body);
     if(opt.lit!==false)sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\n'+FS_DECL).replace('#include <emissivemap_fragment>',FS_BODY);
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform float uEcho;uniform float uEchoI;uniform float uEchoBS;').replace('#include <dithering_fragment>','#include <dithering_fragment>\n  if(uEcho>.5){float ff=gl_FrontFacing?1.:0.;float isT=uEchoBS>.5?ff:1.-ff;gl_FragColor=vec4(vec3(isT*uEchoI),1.);}');
   };
   mat.customProgramCacheKey=()=>'h'+(opt.valve?1:0)+(opt.lit===false?0:1);
   return mat;
@@ -992,7 +993,7 @@ function frame(now){
   }
   extrasFrame(real,dt,t,L,R,now);
   controls.update();
-  if(composer&&glowOn&&theme==='dark'&&!SU.uFlu.value){composer.render();}else renderer.render(scene,camera);
+  if(ECHO.on)echoRender(real);else if(composer&&glowOn&&theme==='dark'&&!SU.uFlu.value){composer.render();}else renderer.render(scene,camera);
   drawMon();
   // 느린 기기에서는 발광 후처리를 자동으로 끔
   if(composer&&glowOn&&!DBG){slow=real>.045?slow+1:Math.max(0,slow-2);if(slow>90){glowOn=false;$('lyGlow').checked=false;}}
@@ -1168,6 +1169,137 @@ const DIR0=new V3(1.2,.9,11).sub(TARGET).normalize();let camAnim=null;
 function resetView(){const h=view.clientHeight,t=Math.tan(camera.fov*Math.PI/360),d=Math.max((h<420?3.6:3.25)/t,2.6/(t*camera.aspect));
   camAnim={p0:camera.position.clone(),q0:controls.target.clone(),p1:TARGET.clone().addScaledVector(DIR0,d),s:performance.now()};userMoved=false;controls.enableDamping=false;}
 $('tReset').addEventListener('click',resetView);controls.addEventListener('start',()=>{camAnim=null;controls.enableDamping=true;});
+/* ───────────── 9. 심초음파 (2D echo + M-mode) ───────────── */
+const ECHO={on:false,view:'plax',tilt:0,rot:0,mm:true,cur:0,lastCol:-1,key:''};
+const RTW=448,RTH=356,MW=600,MH=256,DMAX=3.9,ANG=.68,WD=2*DMAX*Math.sin(ANG),EWIN=4;
+const rtE=new THREE.WebGLRenderTarget(RTW,RTH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter});
+const rtM=new THREE.WebGLRenderTarget(MW,MH,{minFilter:THREE.LinearFilter,magFilter:THREE.LinearFilter,depthBuffer:false});
+const eCam=new THREE.OrthographicCamera(-1,1,1,-1,.05,30),qCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
+const ePlane=new THREE.Plane(),ePlane2=new THREE.Plane();
+const LVap=v3(LD.LVapO),lvMid=MVc.clone().addScaledVector(uLV,.45*LLV);
+let EB={P:new V3(),D:new V3(0,0,-1),N:new V3(1,0,0),L:new V3()};
+const EVIEWS=[['plax','PLAX','흉골연 장축'],['psax-av','PSAX-AV','단축 · 대동맥판'],['psax-mv','PSAX-MV','단축 · 승모판'],['psax-pm','PSAX-PM','단축 · 유두근'],['a4c','A4C','심첨 4방'],['a2c','A2C','심첨 2방'],['sc4c','SC','늑골하 4방']];
+function viewBasis(name){
+  const perp=(v,a)=>v.clone().addScaledVector(a,-v.dot(a)).normalize();let P,D,N,ref,tg;
+  if(name==='plax'||name.indexOf('psax')===0){
+    D=perp(new V3(0,0,-1),uLV);
+    if(name==='plax'){N=new V3().crossVectors(uLV,AOc.clone().sub(MVc)).normalize();D=perp(D,N);tg=MVc.clone().lerp(lvMid,.45);ref=LVap;}
+    else{N=uLV.clone();tg=name==='psax-av'?AOc.clone():name==='psax-mv'?MVc.clone().addScaledVector(uLV,.22*LLV):MVc.clone().addScaledVector(uLV,.55*LLV);ref=TVc;}
+    P=tg.clone().addScaledVector(D,-2.25);
+  }else if(name==='a4c'||name==='a2c'){
+    D=uLV.clone().negate();N=new V3().crossVectors(uLV,TVc.clone().sub(MVc)).normalize();if(name==='a2c')N.applyAxisAngle(uLV,1.05);
+    P=LVap.clone().addScaledVector(uLV,.5);ref=TVc;tg=MVc.clone();
+  }else{
+    tg=MVc.clone().lerp(TVc,.5).addScaledVector(uLV,.4*LLV);P=tg.clone().add(new V3(-.5,-2.7,1.2));D=tg.clone().sub(P).normalize();
+    N=new V3().crossVectors(D,TVc.clone().sub(MVc)).normalize();ref=TVc;
+  }
+  let L=new V3().crossVectors(N,D).normalize();if(ref.clone().sub(P).dot(L)>0){N.negate();L.negate();}
+  const tq=new THREE.Quaternion().setFromAxisAngle(L,ECHO.tilt);D.applyQuaternion(tq);N.applyQuaternion(tq);
+  const rq=new THREE.Quaternion().setFromAxisAngle(D,ECHO.rot);N.applyQuaternion(rq);L.crossVectors(N,D).normalize();
+  EB={P,D,N,L,tg};
+}
+function aimCursor(){const d=EB.tg.clone().sub(EB.P);ECHO.cur=clamp(Math.atan2(d.dot(EB.L),d.dot(EB.D)),-ANG+.05,ANG-.05);}
+function setupEchoCam(){const {P,D,N}=EB,C=P.clone().addScaledVector(D,DMAX/2);
+  eCam.left=-WD/2;eCam.right=WD/2;eCam.top=DMAX/2;eCam.bottom=-DMAX/2;eCam.updateProjectionMatrix();
+  eCam.position.copy(C).addScaledVector(N,10);eCam.up.copy(D).negate();eCam.lookAt(C);eCam.updateMatrixWorld();
+  ePlane.set(N.clone().negate(),N.dot(P));ePlane2.set(N.clone(),-(N.dot(P)-.07));}
+// 3D probe & fan
+const fanMat=new THREE.MeshBasicMaterial({color:0x57d3e6,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false});
+const fanEdge=new THREE.LineBasicMaterial({color:0x57d3e6,transparent:true,opacity:.75});
+const probe=new THREE.Group();heart.add(probe);probe.visible=false;
+function buildFan(){while(probe.children.length){const c=probe.children.pop();c.geometry.dispose();}
+  const {P,D,L}=EB,pts=[P.clone()];for(let i=0;i<=40;i++){const a=-ANG+2*ANG*i/40;pts.push(P.clone().addScaledVector(D,Math.cos(a)*DMAX).addScaledVector(L,Math.sin(a)*DMAX));}
+  const idx=[];for(let i=1;i<=40;i++)idx.push(0,i,i+1);const g=new THREE.BufferGeometry().setFromPoints(pts);g.setIndex(idx);
+  const f=new THREE.Mesh(g,fanMat);f.renderOrder=12;probe.add(f);
+  const e=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),fanEdge);e.renderOrder=12;probe.add(e);
+  const b=new THREE.Mesh(new THREE.CylinderGeometry(.09,.13,.55,16),new THREE.MeshStandardMaterial({color:0xdfe8ef,roughness:.35,metalness:.2}));
+  b.position.copy(P).addScaledVector(D,-.3);b.quaternion.setFromUnitVectors(new V3(0,1,0),D.clone().negate());probe.add(b);}
+// echo shaders
+const ECHO_GLSL=`
+uniform sampler2D tE;uniform vec2 uRes;uniform float uWd,uDm,uAng,uT,uCur,uMM,uGain;varying vec2 vUv;
+float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x),mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)),f.x),f.y);}
+float echoAt(vec2 xy){
+  vec2 uv=vec2(xy.x/uWd+.5,1.-xy.y/uDm),px=1./uRes;
+  float t=texture2D(tE,uv).r*.36+(texture2D(tE,uv+vec2(px.x,0.)).r+texture2D(tE,uv-vec2(px.x,0.)).r+texture2D(tE,uv+vec2(0.,px.y)).r+texture2D(tE,uv-vec2(0.,px.y)).r)*.16;
+  float r=length(xy),th=atan(xy.x,xy.y);
+  float e=abs(texture2D(tE,uv+vec2(0.,2.5*px.y)).r-texture2D(tE,uv-vec2(0.,2.5*px.y)).r);
+  float sp=vn(vec2(r*75.,th*58.)+uT*.12)*.6+vn(vec2(r*170.,th*125.)-uT*.08)*.4;
+  float blood=.02+.05*vn(vec2(r*70.,th*55.)+uT*.9);
+  float v=mix(blood,.34+.8*sp*sp*1.25,t)+e*.6*sp;
+  v*=mix(1.1,.55,clamp(r/uDm,0.,1.))*uGain;
+  v+=.25*exp(-r/.22)*sp;
+  return clamp(v,0.,1.);
+}`;
+const qGeo=new THREE.PlaneGeometry(2,2),QVS='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
+const EU={tE:{value:rtE.texture},tM:{value:rtM.texture},uRes:{value:new THREE.Vector2(RTW,RTH)},uWd:{value:WD},uDm:{value:DMAX},uAng:{value:ANG},uT:{value:0},uCur:{value:0},uMM:{value:1},uCol:{value:0},uGain:{value:1}};
+const dMat=new THREE.ShaderMaterial({uniforms:EU,vertexShader:QVS,depthTest:false,depthWrite:false,fragmentShader:ECHO_GLSL+`
+void main(){vec2 xy=vec2((vUv.x-.5)*uWd,(1.-vUv.y)*uDm);float r=length(xy),th=atan(xy.x,xy.y);
+  if(abs(th)>uAng||r>uDm){gl_FragColor=vec4(0.,0.,0.,1.);return;}
+  float v=pow(echoAt(xy),1.1)*smoothstep(uAng,uAng-.015,abs(th))*smoothstep(uDm,uDm-.05,r);
+  vec3 c=vec3(v)*vec3(1.,.985,.955);
+  if(uMM>.5){float d=abs(sin(th-uCur))*r;if(d<.007*uDm&&fract(r*7.)<.55&&abs(th-uCur)<.3)c=mix(c,vec3(.45,.86,1.),.75);}
+  gl_FragColor=vec4(c,1.);}`});
+const cMat=new THREE.ShaderMaterial({uniforms:EU,vertexShader:QVS,depthTest:false,depthWrite:false,fragmentShader:ECHO_GLSL+`
+void main(){float r=(1.-vUv.y)*uDm;vec2 xy=r*vec2(sin(uCur),cos(uCur));float v=pow(echoAt(xy),1.1);gl_FragColor=vec4(vec3(v)*vec3(1.,.985,.955),1.);}`});
+const mMat=new THREE.ShaderMaterial({uniforms:EU,vertexShader:QVS,depthTest:false,depthWrite:false,fragmentShader:`uniform sampler2D tM;uniform float uCol;varying vec2 vUv;
+void main(){vec3 c=texture2D(tM,vUv).rgb;float g=fract(vUv.x-uCol);if(g>0.&&g<.012)c=vec3(0.);gl_FragColor=vec4(c,1.);}`});
+const dScene=new THREE.Scene(),cScene=new THREE.Scene(),mScene=new THREE.Scene();
+dScene.add(new THREE.Mesh(qGeo,dMat));cScene.add(new THREE.Mesh(qGeo,cMat));mScene.add(new THREE.Mesh(qGeo,mMat));
+const slabMat=new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide});
+const avLeaf=[];aoValve.g.traverse(o=>{if(o.isMesh)avLeaf.push(o);});
+const vis=new Map();
+function solo(list){heart.traverse(o=>{if(o!==heart){vis.set(o,o.visible);o.visible=false;}});list.forEach(o=>{let p=o;while(p&&p!==heart){p.visible=true;p=p.parent;}});}
+function unsolo(){vis.forEach((v,o)=>{o.visible=v;});vis.clear();}
+function echoPass(){
+  const key=ECHO.view+'|'+ECHO.tilt+'|'+ECHO.rot;viewBasis(ECHO.view);setupEchoCam();if(key!==ECHO.key){ECHO.key=key;buildFan();drawEchoOv();}
+  const bg=scene.background;scene.background=null;const list=[wallF,wallB].concat(inner.slice(0,4));
+  solo(list);const dw=list.map(m=>m.material.depthWrite);list.forEach(m=>{m.material.depthWrite=true;});
+  SU.uEcho.value=1;renderer.clippingPlanes=[ePlane];renderer.setRenderTarget(rtE);renderer.setClearColor(0x000000,1);renderer.clear();renderer.render(scene,eCam);
+  unsolo();list.forEach((m,i)=>{m.material.depthWrite=dw[i];});
+  solo(avLeaf);scene.overrideMaterial=slabMat;renderer.clippingPlanes=[ePlane,ePlane2];renderer.autoClear=false;renderer.render(scene,eCam);renderer.autoClear=true;scene.overrideMaterial=null;unsolo();
+  renderer.clippingPlanes=[];SU.uEcho.value=0;scene.background=bg;renderer.setRenderTarget(null);
+}
+function mmodePass(){const col=Math.floor(((sim.t%EWIN)/EWIN)*MW)%MW;EU.uCol.value=col/MW;
+  if(ECHO.lastCol<0){ECHO.lastCol=col;return;}if(col===ECHO.lastCol)return;
+  const seg=(a,b)=>{if(b<=a)return;rtM.viewport.set(a,0,b-a,MH);rtM.scissor.set(a,0,b-a,MH);rtM.scissorTest=true;renderer.setRenderTarget(rtM);renderer.autoClear=false;renderer.render(cScene,qCam);renderer.autoClear=true;};
+  const a=ECHO.lastCol+1;if(col>=a)seg(a,col+1);else{seg(a,MW);seg(0,col+1);}ECHO.lastCol=col;renderer.setRenderTarget(null);}
+const echoP=$('echoP'),echoS=$('echoS'),echoM=$('echoM'),eOv=$('echoOv'),eEcg=$('echoEcg');
+function rectOf(el){const c=glc.getBoundingClientRect(),r=el.getBoundingClientRect();return [r.left-c.left,c.bottom-r.bottom,r.width,r.height];}
+let eAcc=1;
+function echoRender(real){
+  const W=view.clientWidth,H=view.clientHeight,cr=glc.getBoundingClientRect(),pr=echoP.getBoundingClientRect(),wide=W>=760;
+  const m=wide?[0,0,Math.max(60,pr.left-cr.left-6),H]:[0,0,W,Math.max(60,cr.bottom-pr.bottom-6)];
+  EU.uT.value=sim.t;EU.uCur.value=ECHO.cur;EU.uMM.value=ECHO.mm?1:0;
+  eAcc+=real;if(eAcc>=1/45||paused){eAcc=0;echoPass();}
+  if(ECHO.mm)mmodePass();
+  renderer.setScissorTest(true);renderer.setClearColor(0x04080d,1);
+  renderer.setViewport(0,0,W,H);renderer.setScissor(0,0,W,H);renderer.clear();
+  renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);
+  let s=rectOf(echoS);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(dScene,qCam);
+  if(ECHO.mm){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
+  renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
+  if(ECHO.mm){const w=eEcg.clientWidth,h=eEcg.clientHeight;if(eEcg.width!==Math.round(w*dpr)){eEcg.width=Math.round(w*dpr);eEcg.height=Math.round(h*dpr);}
+    const ctx=eEcg.getContext('2d');ex=ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);trace(buf[1],0,h*.62,w,EWIN,h*.32,'#6ff09a',1.5);ex=ecgCtx;}
+}
+function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eOv.width=Math.round(w*dpr);eOv.height=Math.round(h*dpr);const c=eOv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
+  const sx=w/WD,sy=h/DMAX,ox=w/2;c.strokeStyle='rgba(255,230,120,.85)';c.fillStyle='rgba(255,230,120,.95)';c.lineWidth=1;c.font='600 12px "IBM Plex Mono",monospace';
+  for(let cm=1;cm<=15;cm++){const r=cm*.25,x=ox-Math.sin(ANG)*r*sx-4,y=Math.cos(ANG)*r*sy;c.beginPath();c.moveTo(x,y);c.lineTo(x-(cm%5?4:9),y);c.stroke();if(cm%5===0)c.fillText(String(cm),x-28,y+4);}
+  const v=EVIEWS.find(q=>q[0]===ECHO.view);c.font='600 14px "IBM Plex Sans KR",sans-serif';c.fillText(v[1],10,20);c.font='500 11px "IBM Plex Sans KR",sans-serif';c.fillStyle='rgba(230,238,245,.75)';c.fillText(v[2]+' · 깊이 16 cm',10,38);
+  c.fillStyle='#ffe678';c.beginPath();c.moveTo(ox+Math.sin(ANG)*.3*sx+14,10);c.lineTo(ox+Math.sin(ANG)*.3*sx+22,10);c.lineTo(ox+Math.sin(ANG)*.3*sx+18,17);c.closePath();c.fill();}
+function echoLayout(){const ph=echoP.clientHeight-($('eHead').offsetHeight+$('eTools').offsetHeight+18),pw=echoP.clientWidth;
+  let sh=Math.min(pw/(WD/DMAX),ph*(ECHO.mm?.64:1));echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';echoM.style.display=ECHO.mm?'':'none';drawEchoOv();}
+function setEcho(on){ECHO.on=on;$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
+  if(on){ECHO.key='';viewBasis(ECHO.view);aimCursor();ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
+  else{renderer.setScissorTest(false);sizeAll();}}
+$('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));
+EVIEWS.forEach(([k,ab,nm])=>{const b=document.createElement('button');b.type='button';b.dataset.v=k;b.textContent=ab;b.title=nm;b.setAttribute('aria-pressed',k===ECHO.view);
+  b.addEventListener('click',()=>{ECHO.view=k;ECHO.tilt=0;ECHO.rot=0;$('eTilt').value=0;$('eRot').value=0;viewBasis(k);aimCursor();[...$('eView').children].forEach(x=>x.setAttribute('aria-pressed',x===b));});$('eView').appendChild(b);});
+$('eMM').addEventListener('click',()=>{ECHO.mm=!ECHO.mm;$('eMM').setAttribute('aria-pressed',ECHO.mm);echoLayout();});
+$('eTilt').addEventListener('input',e=>{ECHO.tilt=+e.target.value*Math.PI/180;});$('eRot').addEventListener('input',e=>{ECHO.rot=+e.target.value*Math.PI/180;});
+echoS.addEventListener('pointerdown',e=>{const r=echoS.getBoundingClientRect(),x=((e.clientX-r.left)/r.width-.5)*WD,y=(e.clientY-r.top)/r.height*DMAX;ECHO.cur=clamp(Math.atan2(x,y),-ANG+.03,ANG-.03);});
+new ResizeObserver(()=>{if(ECHO.on)echoLayout();}).observe(echoP);
+
 sizeAll();setOpacity();setCut();applyTheme();
 setScenario(SC.find(s=>'#'+s.id===location.hash)||SC[0]);
 window.addEventListener('hashchange',()=>{const s=SC.find(x=>'#'+x.id===location.hash);if(s&&s!==sim.sc)setScenario(s);});
