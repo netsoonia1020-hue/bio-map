@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 18';
+const VER='Ver.cardio 19';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1222,10 +1222,10 @@ const probeMat=new THREE.MeshStandardMaterial({color:0xe9f6ff,roughness:.25,meta
 const probeTip=new THREE.MeshStandardMaterial({color:0x57d3e6,roughness:.3,emissive:0x57d3e6,emissiveIntensity:.8});
 const probe=new THREE.Group();heart.add(probe);probe.visible=false;
 const pLabCv=document.createElement('canvas');pLabCv.width=512;pLabCv.height=128;const pLabTex=new THREE.CanvasTexture(pLabCv);
-const pLab=new THREE.Sprite(new THREE.SpriteMaterial({map:pLabTex,transparent:true,depthTest:false}));pLab.scale.set(1.35,.34,1);pLab.renderOrder=14;let pLabTxt='';
+const pLab=new THREE.Sprite(new THREE.SpriteMaterial({map:pLabTex,transparent:true,depthTest:false}));pLab.scale.set(.9,.22,1);pLab.renderOrder=14;let pLabTxt='';
 function setProbeLabel(t){const sub=EWIN_TXT[ECHO.view]||'',key=t+'|'+sub;if(key===pLabTxt)return;pLabTxt=key;const x=pLabCv.getContext('2d');x.clearRect(0,0,512,128);
   x.fillStyle='rgba(4,10,16,.88)';x.strokeStyle='#57d3e6';x.lineWidth=5;x.beginPath();x.moveTo(20,6);x.arcTo(506,6,506,122,16);x.arcTo(506,122,6,122,16);x.arcTo(6,122,6,6,16);x.arcTo(6,6,506,6,16);x.closePath();x.fill();x.stroke();
-  x.textAlign='center';x.textBaseline='middle';x.fillStyle='#ffe678';x.font='600 46px "IBM Plex Mono",monospace';x.fillText(t,256,44);x.fillStyle='#e6eef5';x.font='500 34px "IBM Plex Sans KR",sans-serif';x.fillText(sub,256,94);pLabTex.needsUpdate=true;}
+  x.textAlign='center';x.textBaseline='middle';x.fillStyle='#ffe678';x.font='600 64px "IBM Plex Mono",monospace';x.fillText(t,256,66);pLabTex.needsUpdate=true;}
 function buildFan(){while(probe.children.length){const c=probe.children.pop();if(c.geometry)c.geometry.dispose();}
   const {P,D,L}=EB,pt=(a,r)=>P.clone().addScaledVector(D,Math.cos(a)*r).addScaledVector(L,Math.sin(a)*r);
   const pts=[P.clone()];for(let i=0;i<=40;i++)pts.push(pt(-ANG+2*ANG*i/40,DMAX));
@@ -1239,7 +1239,7 @@ function buildFan(){while(probe.children.length){const c=probe.children.pop();if
   const tip=new THREE.Mesh(new THREE.BoxGeometry(.42,.08,.16),probeTip);tip.position.copy(P).addScaledVector(D,-.07);
   const m=new THREE.Matrix4().makeBasis(L,D.clone().negate(),new V3().crossVectors(L,D.clone().negate()));tip.quaternion.setFromRotationMatrix(m);probe.add(tip);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(.26,.02,8,40),new THREE.MeshBasicMaterial({color:0x8fefff,transparent:true,opacity:.8,depthTest:false}));ring.position.copy(P);ring.quaternion.setFromUnitVectors(new V3(0,0,1),D);ring.renderOrder=13;probe.add(ring);
-  pLab.position.copy(P).addScaledVector(D,-1.1).add(new V3(0,.28,0));probe.add(pLab);setProbeLabel((EVIEWS.find(v=>v[0]===ECHO.view)||[0,''])[1]);}
+  pLab.position.copy(P).addScaledVector(D,-.95);probe.add(pLab);setProbeLabel((EVIEWS.find(v=>v[0]===ECHO.view)||[0,''])[1]);}
 // echo shaders
 const ECHO_GLSL=`
 uniform sampler2D tE;uniform vec2 uRes;uniform float uWd,uDm,uAng,uT,uCur,uMM,uGain;varying vec2 vUv;
@@ -1286,7 +1286,7 @@ function curBasis(){const tk=ECHO.view+'|'+ECHO.tilt+'|'+ECHO.rot;
   const q=EBcur.q,L=new V3(1,0,0).applyQuaternion(q),D=new V3(0,-1,0).applyQuaternion(q),N=new V3(0,0,1).applyQuaternion(q);EB={P:EBcur.P.clone(),D,N,L,tg:ECHO.tgt.tg};}
 function camSwing(t){let dir=t.N.clone().multiplyScalar(.85).addScaledVector(t.D,-.5).add(new V3(0,.22,0)).normalize();
   const cur=camera.position.clone().sub(controls.target);if(dir.dot(cur)<0)dir=t.N.clone().multiplyScalar(-.85).addScaledVector(t.D,-.5).add(new V3(0,.22,0)).normalize();
-  ECam={d0:cur.clone().normalize(),d1:dir,r:view.clientWidth>=760?Math.max(cur.length(),16):9.8,r0:cur.length(),t0:controls.target.clone(),s:performance.now()};controls.enableDamping=false;userMoved=true;}
+  ECam={d0:cur.clone().normalize(),d1:dir,r:view.clientWidth>=760?(()=>{const cr=glc.getBoundingClientRect(),pr=echoP.getBoundingClientRect(),w3=Math.max(120,pr.left-cr.left-6),asp=w3/view.clientHeight,tt=Math.tan(camera.fov*Math.PI/360);return clamp(Math.max(13,3.4/(tt*asp)),13,48);})():9.8,r0:cur.length(),t0:controls.target.clone(),s:performance.now()};controls.enableDamping=false;userMoved=true;}
 function camStep(){if(!ECam)return;const k=Math.min(1,(performance.now()-ECam.s)/900),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
   const q=new THREE.Quaternion().setFromUnitVectors(ECam.d0,ECam.d1),qi=new THREE.Quaternion().slerp(q,e);
   controls.target.lerpVectors(ECam.t0,TARGET,e);camera.position.copy(controls.target).addScaledVector(ECam.d0.clone().applyQuaternion(qi),ECam.r0+(ECam.r-ECam.r0)*e);camera.lookAt(controls.target);
@@ -1317,6 +1317,7 @@ function echoRender(real){
   renderer.setScissorTest(true);renderer.setClearColor(0x04080d,1);
   renderer.setViewport(0,0,W,H);renderer.setScissor(0,0,W,H);renderer.clear();
   if(m){renderer.setViewport(...m);renderer.setScissor(...m);camera.aspect=m[2]/m[3];camera.updateProjectionMatrix();renderer.render(scene,camera);}
+  orientOverlay(m?[m[0]+6,m[1]+(H<560?60:112),m[2]-12,m[3]-(H<560?110:180)]:(ECHO.tab==='3d'?rectOf($('e3D')):null));
   let s=rectOf(echoS);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(dScene,qCam);
   if(!m&&ECHO.tab==='3d'){const q=rectOf($('e3D'));renderer.setViewport(...q);renderer.setScissor(...q);renderer.setClearColor(0x0a1420,1);renderer.clear();camera.aspect=q[2]/q[3];camera.zoom=1;camera.updateProjectionMatrix();renderer.render(scene,camera);camera.zoom=1;camera.updateProjectionMatrix();}
   if(ECHO.mm&&ECHO.tab==='mm'){s=rectOf(echoM);renderer.setViewport(...s);renderer.setScissor(...s);renderer.render(mScene,qCam);}
@@ -1346,36 +1347,45 @@ function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eO
   {const {P,D,N,L}=EB,dd=new V3();c.font='600 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif';
    CHAM.forEach(ch=>{dd.copy(ch[1]).sub(P);if(Math.abs(dd.dot(N))>.45)return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.95||yd>DMAX*.95||yd<.3)return;
      const t=ch[0].split(' ')[0],tw=c.measureText(t).width,x=ox+xl*sx-tw/2-5,y=yd*sy+5;c.fillStyle='rgba(4,8,13,.55)';rrect(c,x,y-13,tw+10,18,4);c.fill();c.fillStyle=ch[2];c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,x+5,y);});}
-  lesionTargets().forEach(o=>{const th=Math.atan2(o.x,o.y),r=Math.hypot(o.x,o.y);if(Math.abs(th)>ANG||r>DMAX)return;const tx=ox+o.x*sx,ty=o.y*sy,side=tx<ox?-1:1,bx=tx+side*42,by=ty-26;
+  lesionTargets().forEach(o=>{const th=Math.atan2(o.x,o.y),r=Math.hypot(o.x,o.y);if(Math.abs(th)>ANG||r>DMAX)return;const tx=ox+o.x*sx,ty=o.y*sy,side=tx<ox?-1:1,bx=clamp(tx+side*42,8,w-8),by=Math.max(40,ty-26);
     c.save();c.strokeStyle=o.col;c.fillStyle=o.col;c.lineWidth=2.4;c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=4;c.beginPath();c.moveTo(bx,by);c.lineTo(tx+side*6,ty-4);c.stroke();
     const ang=Math.atan2(ty-4-by,tx+side*6-bx);c.beginPath();c.moveTo(tx+side*2,ty-1);c.lineTo(tx+side*6-Math.cos(ang-.5)*11,ty-4-Math.sin(ang-.5)*11);c.lineTo(tx+side*6-Math.cos(ang+.5)*11,ty-4-Math.sin(ang+.5)*11);c.closePath();c.fill();c.restore();
     c.font='600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif';const tw=c.measureText(o.label).width;boxText(c,side<0?Math.max(4,bx-tw-12):Math.min(w-tw-16,bx),by-4,o.label,'600 '+(fs-.5)+'px "IBM Plex Sans KR",sans-serif',o.col);});}
-function echoLayout(){const narrow=view.clientWidth<760,pw=echoP.clientWidth,gap=6;
+function echoLayout(){const narrow=view.clientWidth<760,gap=6;
+  if(narrow){const vb=view.getBoundingClientRect(),bb=document.querySelector('.bar .tools').getBoundingClientRect();echoP.style.bottom=Math.max(12,vb.bottom-bb.top+8)+'px';}else echoP.style.bottom='';
+  const pw=echoP.clientWidth;
   if(!narrow&&ECHO.tab==='3d'){ECHO.tab='fn';ECHO.mm=false;}
   $('eTab3').hidden=!narrow;[...$('eTabs').children].forEach(b=>b.setAttribute('aria-selected',b.dataset.v===ECHO.tab));
-  const low={fn:$('eFunc'),mm:echoM,'3d':$('e3D')};Object.keys(low).forEach(k=>{low[k].style.display=k===ECHO.tab?'':'none';});
+  const low={fn:$('eFunc'),mm:echoM,'3d':$('e3D')};if(!low[ECHO.tab])ECHO.tab='';Object.keys(low).forEach(k=>{low[k].style.display=k===ECHO.tab?'':'none';});
   $('eAdj').style.display=ECHO.adj?'':'none';$('eAdjB').setAttribute('aria-expanded',ECHO.adj);
-  let lowH=ECHO.tab==='fn'?$('eFunc').offsetHeight:ECHO.tab==='mm'?(narrow?170:200):230;
+  let lowH=ECHO.tab==='fn'?$('eFunc').offsetHeight:ECHO.tab==='mm'?(narrow?170:200):ECHO.tab==='3d'?230:0;
   if(ECHO.tab==='mm')echoM.style.height=lowH+'px';if(ECHO.tab==='3d')$('e3D').style.height=lowH+'px';
   const fixed=$('eHead').offsetHeight+$('eTabs').offsetHeight+lowH+$('eTools').offsetHeight+gap*5,avail=echoP.clientHeight-fixed;
   const sh=Math.max(140,Math.min(pw/(WD/DMAX),avail));echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';drawEchoOv();drawBull();}
-function setTab(t){ECHO.tab=t;ECHO.mm=t==='mm';if(t==='mm'){ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);}echoLayout();}
+function setTab(t){if(t===ECHO.tab&&echoP.clientHeight<520)t='';ECHO.tab=t;ECHO.mm=t==='mm';if(t==='mm'){ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);}echoLayout();}
 const orient=new THREE.Group();orient.visible=false;heart.add(orient);
-{const cx=-.43,cz=-.8,ra=4.0,rb=2.75,y0=-3.6,y1=3.4;
-  const shell=new THREE.Mesh(new THREE.CylinderGeometry(1,1,y1-y0,48,1,true),new THREE.MeshBasicMaterial({color:0x9fdcff,transparent:true,opacity:.05,side:THREE.DoubleSide,depthWrite:false}));
-  shell.scale.set(ra,1,rb);shell.position.set(cx,(y0+y1)/2,cz);shell.renderOrder=1;orient.add(shell);
-  const lm=new THREE.LineBasicMaterial({color:0x9fdcff,transparent:true,opacity:.35});
-  for(let k=0;k<8;k++){const y=y1-.35-k*.82,pts=[];for(let i=0;i<=40;i++){const t=-1.25+2.5*i/40;pts.push(new V3(cx+Math.sin(t)*ra*.98,y-.25*(1-Math.cos(t)),cz+Math.cos(t)*rb*.98));}orient.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));}
-  const st=new THREE.Mesh(new THREE.BoxGeometry(.42,4.6,.08),new THREE.MeshBasicMaterial({color:0xcfe8ff,transparent:true,opacity:.18,depthWrite:false}));st.position.set(cx,y1-2.5,cz+rb);orient.add(st);
-  [[cx,y1+.45,cz+rb*.4,'머리 ↑','#cfe3ee'],[cx,y1-2.4,cz+rb+.35,'흉골','#cfe3ee'],[cx+ra+.5,0,cz+.6,'환자 왼쪽','#cfe3ee'],[cx-ra-.5,0,cz+.6,'환자 오른쪽','#cfe3ee']].forEach(q=>orient.add(textSprite(q[3],q[4],new V3(q[0],q[1],q[2]),.34)));}
+{const CH=window.CHEST;if(CH){const g=n=>{const P=CH.parts[n],i16=new Int16Array(b64(P.p)),pos=new Float32Array(i16.length);for(let k=0;k<i16.length;k++)pos[k]=i16[k]/CH.q;
+    const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.BufferAttribute(pos,3));ge.setIndex(new THREE.BufferAttribute(P.w===2?new Uint16Array(b64(P.i)):new Uint32Array(b64(P.i)),1));ge.computeVertexNormals();return ge;};
+  const bm=new THREE.MeshStandardMaterial({color:0xe9e2d0,roughness:.6,metalness:0,transparent:true,opacity:.3,depthWrite:false,envMap:envTex,envMapIntensity:.4});
+  const cm=new THREE.MeshStandardMaterial({color:0xbcd8e6,roughness:.5,transparent:true,opacity:.28,depthWrite:false});
+  const b1=new THREE.Mesh(g('bone'),bm),c1=new THREE.Mesh(g('cart'),cm);b1.renderOrder=2;c1.renderOrder=2;orient.add(b1,c1);}}
 const CHAM=[['LV 좌심실',v3(LD.LVin),'#ff8a92'],['RV 우심실',v3(LD.RVin),'#8fb4ff'],['LA 좌심방',v3(LD.LAc),'#ffb0a8'],['RA 우심방',v3(LD.RAc),'#a9c8ff'],['Ao 대동맥',AOc.clone().addScaledVector(nAo,.5),'#ff9a9a']];
 CHAM.forEach(c=>{const s=textSprite(c[0].split(' ')[0],c[2],c[1],.26);s.material.depthTest=false;s.renderOrder=15;orient.add(s);});
 function textSprite(t,col,pos,h){const cv=document.createElement('canvas'),x=cv.getContext('2d');x.font='600 44px "IBM Plex Sans KR",sans-serif';const w=Math.ceil(x.measureText(t).width)+36;cv.width=w;cv.height=72;
   x.fillStyle='rgba(4,10,16,.78)';x.beginPath();x.moveTo(14,2);x.arcTo(w-2,2,w-2,70,14);x.arcTo(w-2,70,2,70,14);x.arcTo(2,70,2,2,14);x.arcTo(2,2,w-2,2,14);x.closePath();x.fill();
   x.font='600 44px "IBM Plex Sans KR",sans-serif';x.fillStyle=col;x.textBaseline='middle';x.fillText(t,18,38);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));sp.scale.set(h*w/72,h,1);sp.position.copy(pos);sp.renderOrder=15;return sp;}
-function setEcho(on){orient.visible=on;ECHO.on=on;$('tEcho').textContent=on?'초음파 닫기':'심초음파';if(!on){ECam=null;EBa=null;controls.enableDamping=true;}document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
-  if(on){echoReset();viewBasis(ECHO.view);camSwing(EB);ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
+const eOri=$('eOri'),eCmp=$('eCmp');
+function orientOverlay(r){if(!r){eOri.style.display='none';return;}const cr=glc.getBoundingClientRect(),vr=view.getBoundingClientRect();eOri.style.display='block';
+  eOri.style.left=(cr.left-vr.left+r[0])+'px';eOri.style.top=(cr.top-vr.top+(cr.height-r[1]-r[3]))+'px';eOri.style.width=r[2]+'px';eOri.style.height=r[3]+'px';
+  const v=EVIEWS.find(q=>q[0]===ECHO.view)||['','',''];$('eWinT').textContent=v[1]+' · '+(EWIN_TXT[ECHO.view]||'');
+  const s=64;if(eCmp.width!==s*dpr){eCmp.width=s*dpr;eCmp.height=s*dpr;}const c=eCmp.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,s,s);
+  c.fillStyle='rgba(4,10,16,.7)';c.beginPath();c.arc(s/2,s/2,s/2-1,0,TAU);c.fill();c.strokeStyle='rgba(120,190,220,.35)';c.lineWidth=1;c.stroke();
+  [[new V3(0,1,0),'머리','#ffe678'],[new V3(1,0,0),'왼쪽','#7cf5a6'],[new V3(0,0,1),'앞','#57d3e6']].map(q=>{const d=q[0].clone().transformDirection(camera.matrixWorldInverse);return[d,q[1],q[2]];})
+   .sort((p,q)=>p[0].z-q[0].z).forEach(([d,t,col])=>{const L=20,x=s/2+d.x*L,y=s/2-d.y*L,al=d.z<-.3?.45:1;c.globalAlpha=al;c.strokeStyle=col;c.lineWidth=2;c.beginPath();c.moveTo(s/2,s/2);c.lineTo(x,y);c.stroke();
+     c.fillStyle=col;c.beginPath();c.arc(x,y,2.5,0,TAU);c.fill();c.font='600 9.5px "IBM Plex Sans KR",sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(t,s/2+d.x*(L+9),s/2-d.y*(L+9));c.globalAlpha=1;});}
+function setEcho(on){orient.visible=on;if(!on)orientOverlay(null);ECHO.on=on;$('tEcho').textContent=on?'초음파 닫기':'심초음파';if(!on){ECam=null;EBa=null;controls.enableDamping=true;}document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
+  if(on){if(innerHeight<520)ECHO.tab='';echoReset();viewBasis(ECHO.view);camSwing(EB);ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
   else{renderer.setScissorTest(false);sizeAll();resetView();}}
 $('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));
 $('eBack').addEventListener('click',()=>setEcho(false));
