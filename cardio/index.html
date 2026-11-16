@@ -210,6 +210,7 @@ dt{color:var(--dim)}dd{margin:0}
 .etabs button{flex:1;background:transparent;border:1px solid transparent;border-radius:7px;padding:7px 6px;font-size:12.5px;font-weight:500;color:var(--dim);white-space:nowrap}
 .etabs button[aria-selected="true"]{background:var(--raise);color:var(--accent);border-color:var(--line2)}
 .etabs button[hidden]{display:none}
+@media (min-width:760px){#ePause{display:none}}
 #e3D{width:100%;flex:none;border:1px solid var(--line2);border-radius:10px;pointer-events:none!important}
 #eOri{position:absolute;z-index:5;pointer-events:none;display:none}
 #eOri[hidden]{display:none}
@@ -249,9 +250,8 @@ dt{color:var(--dim)}dd{margin:0}
   .etools input[type=range]{width:90px}
 }
 @media (max-width:759px){
-  .view.echo .tools>*:not(#tEcho):not(#tPause){display:none}
-  .view.echo .tools{justify-content:center}
-  #echoP{left:8px;right:8px;width:auto;top:58px;bottom:58px;height:auto}
+  .view.echo .bar{display:none}
+  #echoP{left:8px;right:8px;width:auto;top:58px;bottom:8px;height:auto}
   .view.echo .picker{max-width:62%}
 }
 @media (max-width:340px){
@@ -325,7 +325,7 @@ dt{color:var(--dim)}dd{margin:0}
         <div class="efunc glass" id="eFunc"><canvas id="eBull"></canvas><div class="efm"><div class="efrow"><div class="efbig"><b id="eEF">--</b><small>LVEF %</small></div><div class="efsm"><span>SV <b id="eSV">--</b> mL</span><span>CO <b id="eCO">--</b> L/min</span><span>EDV <b id="eEDV">--</b> mL</span></div></div><div class="efnote" id="eWM"></div><div class="evl">좌심실 용적 (mL)</div><canvas id="eVol"></canvas></div></div>
         <div id="echoM"><canvas id="echoEcg"></canvas></div>
         <div id="e3D"></div>
-        <div class="etools glass" id="eTools"><div class="erow"><button type="button" class="ib" id="eReset">단면 초기화</button><button type="button" class="ib" id="eAdjB" aria-expanded="false">각도 조절</button><button type="button" class="ib" id="eDop" aria-pressed="true">컬러 도플러</button><span class="erec" id="eRec"></span></div>
+        <div class="etools glass" id="eTools"><div class="erow"><button type="button" class="ib" id="ePause" aria-pressed="false">일시정지</button><button type="button" class="ib" id="eReset">단면 초기화</button><button type="button" class="ib" id="eAdjB" aria-expanded="false">각도 조절</button><button type="button" class="ib" id="eDop" aria-pressed="true">컬러 도플러</button><span class="erec" id="eRec"></span></div>
           <div class="eadj" id="eAdj"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label><span class="ehint">단면을 탭하면 M-mode 커서 이동</span></div></div>
       </div>
       <div id="eOri" hidden><span class="ewin" id="eWinT"></span><canvas id="eCmp"></canvas><span class="edrag">드래그 회전 · 두 손가락 확대</span></div>
