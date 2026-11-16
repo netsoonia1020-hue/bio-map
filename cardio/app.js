@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 23';
+const VER='Ver.cardio 24';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1366,7 +1366,7 @@ function echoLayout(){const narrow=view.clientWidth<760,gap=6;
   const low={fn:$('eFunc'),mm:echoM,'3d':$('e3D')};if(!low[ECHO.tab])ECHO.tab='';Object.keys(low).forEach(k=>{low[k].style.display=k===ECHO.tab?'':'none';});
   $('eAdj').style.display=ECHO.adj?'':'none';$('eAdjB').setAttribute('aria-expanded',ECHO.adj);
   const land=innerHeight<=560&&innerWidth>innerHeight&&!narrow;
-  if(land){const ratio=WD/DMAX,hh=$('eHead').offsetHeight,room=echoP.clientHeight-hh-8;if(ECHO.tab==='3d')ECHO.tab='';
+  if(land){echoS.classList.remove('btn-side','btn-below');echoS.style.marginBottom='';const ratio=WD/DMAX,hh=$('eHead').offsetHeight,room=echoP.clientHeight-hh-8;if(ECHO.tab==='3d')ECHO.tab='';
     if(ECHO.tab==='mm')echoM.style.height=Math.min(130,Math.max(90,room-$('eTabs').offsetHeight-$('eRec').offsetHeight-16))+'px';
     let sh=Math.min(room,echoP.clientWidth*.56/ratio);sh=Math.max(100,sh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();return;}
   const ratio=WD/DMAX,base=$('eHead').offsetHeight+$('eTabs').offsetHeight+$('eRec').offsetHeight+gap*5+($('eAdj').style.display==='none'?0:$('eAdj').offsetHeight+gap),room=echoP.clientHeight-base-2;
@@ -1375,7 +1375,9 @@ function echoLayout(){const narrow=view.clientWidth<760,gap=6;
   else if(ECHO.tab==='mm'||ECHO.tab==='3d'){const minLow=ECHO.tab==='mm'?100:140,maxLow=ECHO.tab==='mm'?(narrow?170:210):900;sh=Math.min(pw/ratio,room*(ECHO.tab==='3d'?.5:.56));lowH=clamp(room-sh,minLow,maxLow);sh=Math.min(pw/ratio,room-lowH);
     (ECHO.tab==='mm'?echoM:$('e3D')).style.height=lowH+'px';}
   else sh=Math.min(pw/ratio,room);
-  sh=Math.max(90,sh);echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();}
+  sh=Math.max(90,sh);let side=(pw-sh*ratio)/2;const below=side<70;if(below)sh=Math.max(90,sh-42);
+  echoS.classList.toggle('btn-side',!below);echoS.classList.toggle('btn-below',below);echoS.style.marginBottom=below?'42px':'';
+  echoS.style.height=sh+'px';echoS.style.width=(sh*ratio)+'px';drawEchoOv();drawBull();}
 function setTab(t){if(t===ECHO.tab&&echoP.clientHeight<520)t='';ECHO.tab=t;ECHO.mm=t==='mm';if(t==='mm'){ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);}echoLayout();}
 const orient=new THREE.Group();orient.visible=false;heart.add(orient);
 {const CH=window.CHEST;if(CH){const g=n=>{const P=CH.parts[n],i16=new Int16Array(b64(P.p)),pos=new Float32Array(i16.length);for(let k=0;k<i16.length;k++)pos[k]=i16[k]/CH.q;
