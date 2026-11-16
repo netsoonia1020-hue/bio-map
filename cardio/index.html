@@ -210,7 +210,12 @@ dt{color:var(--dim)}dd{margin:0}
 .etabs button{flex:1;background:transparent;border:1px solid transparent;border-radius:7px;padding:7px 6px;font-size:12.5px;font-weight:500;color:var(--dim);white-space:nowrap}
 .etabs button[aria-selected="true"]{background:var(--raise);color:var(--accent);border-color:var(--line2)}
 .etabs button[hidden]{display:none}
-#e3D{width:100%;flex:none;border:1px solid var(--line2);border-radius:10px}
+#e3D{width:100%;flex:none;border:1px solid var(--line2);border-radius:10px;pointer-events:none!important}
+#eOri{position:absolute;z-index:5;pointer-events:none;display:none}
+#eOri[hidden]{display:none}
+.ewin{position:absolute;left:8px;top:8px;max-width:calc(100% - 16px);padding:3px 9px;border-radius:7px;background:rgba(4,10,16,.82);border:1px solid var(--line2);color:#ffe678;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#eOri #eCmp{position:absolute!important;inset:auto!important;left:8px!important;bottom:8px!important;width:64px!important;height:64px!important}
+.edrag{position:absolute;right:8px;bottom:8px;font-size:10.5px;color:var(--dim);background:rgba(4,10,16,.7);padding:2px 7px;border-radius:6px}
 .evl{font-size:10px;color:var(--dim);margin-top:2px}
 .ib{border-color:rgba(120,190,220,.34)}
 .ib:hover{border-color:var(--accent);color:var(--ink)}
@@ -232,7 +237,7 @@ dt{color:var(--dim)}dd{margin:0}
   .hint{display:none}
   .hud{top:62px;font-size:11px;max-width:92%}
   input[type=range]{width:74px}
-  .tools{gap:6px 10px;padding:6px 9px;flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;scrollbar-width:none}
+  .tools{gap:6px 8px;padding:6px 9px;flex-wrap:wrap;justify-content:center}
   .tools>*{flex:none}
   #pick{padding:6px 8px}
   #pick .t b{max-width:36vw;font-size:14px}
@@ -240,14 +245,28 @@ dt{color:var(--dim)}dd{margin:0}
   .dhead .src{display:none}
   .view{height:64svh}
   .view.echo{height:100svh}
+  .efbig b{font-size:26px}
+  .etools input[type=range]{width:90px}
+}
+@media (max-width:759px){
   .view.echo .tools>*:not(#tEcho):not(#tPause){display:none}
   .view.echo .tools{justify-content:center}
   #echoP{left:8px;right:8px;width:auto;top:58px;bottom:58px;height:auto}
   .view.echo .picker{max-width:62%}
-  .efbig b{font-size:26px}
-  .etools input[type=range]{width:90px}
+}
+@media (max-width:340px){
+  #pick .t small,#pick .car{display:none}
+  #pick{padding:6px}.picker .nav{padding:8px 6px}
+  #srcSeg button{padding:5px 6px;font-size:11px}
+  .evs button{min-width:58px;padding:4px 6px}
 }
 @media (orientation:landscape) and (max-height:560px){
+  body.echo-on .side,body.echo-on .dock,body.echo-on .phase{display:none}
+  body.echo-on .app{grid-template-columns:1fr}
+  body.echo-on .view{height:100dvh}
+  body.echo-on #echoP{top:8px;bottom:8px;width:min(58%,600px)}
+  body.echo-on .bar{right:calc(min(58%,600px) + 20px)}
+  body.echo-on .tools>*:not(#tEcho):not(#tPause):not(#tReset){display:none}
   html,body{height:100%}
   .app{display:grid;grid-template-columns:minmax(0,1fr) min(300px,36vw);height:100dvh;min-height:0}
   .main{min-height:0}
@@ -309,6 +328,7 @@ dt{color:var(--dim)}dd{margin:0}
         <div class="etools glass" id="eTools"><div class="erow"><button type="button" class="ib" id="eReset">단면 초기화</button><button type="button" class="ib" id="eAdjB" aria-expanded="false">각도 조절</button><button type="button" class="ib" id="eDop" aria-pressed="true">컬러 도플러</button><span class="erec" id="eRec"></span></div>
           <div class="eadj" id="eAdj"><label for="eTilt">기울기 <input id="eTilt" type="range" min="-30" max="30" value="0"></label><label for="eRot">회전 <input id="eRot" type="range" min="-45" max="45" value="0"></label><span class="ehint">단면을 탭하면 M-mode 커서 이동</span></div></div>
       </div>
+      <div id="eOri" hidden><span class="ewin" id="eWinT"></span><canvas id="eCmp"></canvas><span class="edrag">드래그 회전 · 두 손가락 확대</span></div>
       <div class="call glass" id="call"><b></b><span></span></div>
       <div class="layers glass" id="layers">
         <label><input type="checkbox" id="lyFlow" checked> 혈류</label>
@@ -374,6 +394,7 @@ dt{color:var(--dim)}dd{margin:0}
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script src="heart-model.js"></script>
+<script src="chest-model.js"></script>
 <script src="ecg-data.js"></script>
 <script src="scenarios.js"></script>
 <script src="app.js"></script>
