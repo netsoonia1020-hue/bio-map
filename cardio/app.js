@@ -6,7 +6,7 @@ const ss=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
 const gs=(x,c,w)=>{const d=(x-c)/w;return Math.exp(-d*d);};
 const TAU=Math.PI*2,jit=a=>(Math.random()*2-1)*a;
 const DBG=new URLSearchParams(location.search).get('dbg');
-const VER='Ver.cardio 17';
+const VER='Ver.cardio 18';
 
 /* ───────────── 1. 합성 ECG: 심장 쌍극자(x=좌, y=하, z=전)를 12유도로 투영 ───────────── */
 const LEADS=['I','II','III','aVR','aVL','aVF','V1','V2','V3','V4','V5','V6'];
@@ -1187,6 +1187,7 @@ const eCam=new THREE.OrthographicCamera(-1,1,1,-1,.05,30),qCam=new THREE.Orthogr
 const ePlane=new THREE.Plane(),ePlane2=new THREE.Plane();
 const LVap=v3(LD.LVapO),lvMid=MVc.clone().addScaledVector(uLV,.45*LLV);
 let EB={P:new V3(),D:new V3(0,0,-1),N:new V3(1,0,0),L:new V3()};
+const EWIN_TXT={plax:'흉골 좌연 3–4 늑간',['psax-av']:'흉골 좌연 · 90° 회전',['psax-mv']:'흉골 좌연 · 90° 회전',['psax-pm']:'흉골 좌연 · 90° 회전',a4c:'심첨부 (좌측 5 늑간)',a2c:'심첨부 · 60° 회전',sc4c:'명치 아래 (검상돌기)'};
 const EVIEWS=[['plax','PLAX','흉골연 장축','흉골연 장축'],['psax-av','PSAX-AV','단축·대동맥판','흉골연 단축 · 대동맥판'],['psax-mv','PSAX-MV','단축·승모판','흉골연 단축 · 승모판'],['psax-pm','PSAX-PM','단축·유두근','흉골연 단축 · 유두근'],['a4c','A4C','심첨 4방','심첨 4방'],['a2c','A2C','심첨 2방','심첨 2방'],['sc4c','SC','늑골하 4방','늑골하 4방']];
 function viewBasis(name){
   const perp=(v,a)=>v.clone().addScaledVector(a,-v.dot(a)).normalize();let P,D,N,ref,tg;
@@ -1220,11 +1221,11 @@ const beamMat=new THREE.LineDashedMaterial({color:0xffe678,dashSize:.08,gapSize:
 const probeMat=new THREE.MeshStandardMaterial({color:0xe9f6ff,roughness:.25,metalness:.15,emissive:0x1d6f80,emissiveIntensity:.9});
 const probeTip=new THREE.MeshStandardMaterial({color:0x57d3e6,roughness:.3,emissive:0x57d3e6,emissiveIntensity:.8});
 const probe=new THREE.Group();heart.add(probe);probe.visible=false;
-const pLabCv=document.createElement('canvas');pLabCv.width=256;pLabCv.height=72;const pLabTex=new THREE.CanvasTexture(pLabCv);
-const pLab=new THREE.Sprite(new THREE.SpriteMaterial({map:pLabTex,transparent:true,depthTest:false}));pLab.scale.set(1.05,.3,1);pLab.renderOrder=14;let pLabTxt='';
-function setProbeLabel(t){if(t===pLabTxt)return;pLabTxt=t;const x=pLabCv.getContext('2d');x.clearRect(0,0,256,72);x.fillStyle='rgba(4,10,16,.85)';x.strokeStyle='#57d3e6';x.lineWidth=4;
-  x.beginPath();x.moveTo(14,4);x.arcTo(252,4,252,68,12);x.arcTo(252,68,4,68,12);x.arcTo(4,68,4,4,12);x.arcTo(4,4,252,4,12);x.closePath();x.fill();x.stroke();
-  x.fillStyle='#ffe678';x.font='600 34px "IBM Plex Mono",monospace';x.textAlign='center';x.textBaseline='middle';x.fillText(t,128,38);pLabTex.needsUpdate=true;}
+const pLabCv=document.createElement('canvas');pLabCv.width=512;pLabCv.height=128;const pLabTex=new THREE.CanvasTexture(pLabCv);
+const pLab=new THREE.Sprite(new THREE.SpriteMaterial({map:pLabTex,transparent:true,depthTest:false}));pLab.scale.set(1.35,.34,1);pLab.renderOrder=14;let pLabTxt='';
+function setProbeLabel(t){const sub=EWIN_TXT[ECHO.view]||'',key=t+'|'+sub;if(key===pLabTxt)return;pLabTxt=key;const x=pLabCv.getContext('2d');x.clearRect(0,0,512,128);
+  x.fillStyle='rgba(4,10,16,.88)';x.strokeStyle='#57d3e6';x.lineWidth=5;x.beginPath();x.moveTo(20,6);x.arcTo(506,6,506,122,16);x.arcTo(506,122,6,122,16);x.arcTo(6,122,6,6,16);x.arcTo(6,6,506,6,16);x.closePath();x.fill();x.stroke();
+  x.textAlign='center';x.textBaseline='middle';x.fillStyle='#ffe678';x.font='600 46px "IBM Plex Mono",monospace';x.fillText(t,256,44);x.fillStyle='#e6eef5';x.font='500 34px "IBM Plex Sans KR",sans-serif';x.fillText(sub,256,94);pLabTex.needsUpdate=true;}
 function buildFan(){while(probe.children.length){const c=probe.children.pop();if(c.geometry)c.geometry.dispose();}
   const {P,D,L}=EB,pt=(a,r)=>P.clone().addScaledVector(D,Math.cos(a)*r).addScaledVector(L,Math.sin(a)*r);
   const pts=[P.clone()];for(let i=0;i<=40;i++)pts.push(pt(-ANG+2*ANG*i/40,DMAX));
@@ -1238,7 +1239,7 @@ function buildFan(){while(probe.children.length){const c=probe.children.pop();if
   const tip=new THREE.Mesh(new THREE.BoxGeometry(.42,.08,.16),probeTip);tip.position.copy(P).addScaledVector(D,-.07);
   const m=new THREE.Matrix4().makeBasis(L,D.clone().negate(),new V3().crossVectors(L,D.clone().negate()));tip.quaternion.setFromRotationMatrix(m);probe.add(tip);
   const ring=new THREE.Mesh(new THREE.TorusGeometry(.26,.02,8,40),new THREE.MeshBasicMaterial({color:0x8fefff,transparent:true,opacity:.8,depthTest:false}));ring.position.copy(P);ring.quaternion.setFromUnitVectors(new V3(0,0,1),D);ring.renderOrder=13;probe.add(ring);
-  pLab.position.copy(P).addScaledVector(D,-1.05).add(new V3(0,.18,0));probe.add(pLab);setProbeLabel((EVIEWS.find(v=>v[0]===ECHO.view)||[0,''])[1]);}
+  pLab.position.copy(P).addScaledVector(D,-1.1).add(new V3(0,.28,0));probe.add(pLab);setProbeLabel((EVIEWS.find(v=>v[0]===ECHO.view)||[0,''])[1]);}
 // echo shaders
 const ECHO_GLSL=`
 uniform sampler2D tE;uniform vec2 uRes;uniform float uWd,uDm,uAng,uT,uCur,uMM,uGain;varying vec2 vUv;
@@ -1342,6 +1343,9 @@ function drawEchoOv(){const w=eOv.clientWidth,h=eOv.clientHeight;if(!w)return;eO
   const v=EVIEWS.find(q=>q[0]===ECHO.view);boxText(c,w-6,20,v[1]+' · '+v[2],'600 '+fs+'px "IBM Plex Sans KR",sans-serif','#ffe678','r');
   boxText(c,6,h-8,'깊이 16 cm','500 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif','rgba(214,226,236,.9)');
   c.fillStyle='#ffe678';c.beginPath();const mx=ox+Math.sin(ANG)*.3*sx+14;c.moveTo(mx,8);c.lineTo(mx+8,8);c.lineTo(mx+4,15);c.closePath();c.fill();
+  {const {P,D,N,L}=EB,dd=new V3();c.font='600 '+(fs-1)+'px "IBM Plex Sans KR",sans-serif';
+   CHAM.forEach(ch=>{dd.copy(ch[1]).sub(P);if(Math.abs(dd.dot(N))>.45)return;const xl=dd.dot(L),yd=dd.dot(D),th=Math.atan2(xl,yd);if(Math.abs(th)>ANG*.95||yd>DMAX*.95||yd<.3)return;
+     const t=ch[0].split(' ')[0],tw=c.measureText(t).width,x=ox+xl*sx-tw/2-5,y=yd*sy+5;c.fillStyle='rgba(4,8,13,.55)';rrect(c,x,y-13,tw+10,18,4);c.fill();c.fillStyle=ch[2];c.textAlign='left';c.textBaseline='alphabetic';c.fillText(t,x+5,y);});}
   lesionTargets().forEach(o=>{const th=Math.atan2(o.x,o.y),r=Math.hypot(o.x,o.y);if(Math.abs(th)>ANG||r>DMAX)return;const tx=ox+o.x*sx,ty=o.y*sy,side=tx<ox?-1:1,bx=tx+side*42,by=ty-26;
     c.save();c.strokeStyle=o.col;c.fillStyle=o.col;c.lineWidth=2.4;c.shadowColor='rgba(0,0,0,.8)';c.shadowBlur=4;c.beginPath();c.moveTo(bx,by);c.lineTo(tx+side*6,ty-4);c.stroke();
     const ang=Math.atan2(ty-4-by,tx+side*6-bx);c.beginPath();c.moveTo(tx+side*2,ty-1);c.lineTo(tx+side*6-Math.cos(ang-.5)*11,ty-4-Math.sin(ang-.5)*11);c.lineTo(tx+side*6-Math.cos(ang+.5)*11,ty-4-Math.sin(ang+.5)*11);c.closePath();c.fill();c.restore();
@@ -1356,7 +1360,21 @@ function echoLayout(){const narrow=view.clientWidth<760,pw=echoP.clientWidth,gap
   const fixed=$('eHead').offsetHeight+$('eTabs').offsetHeight+lowH+$('eTools').offsetHeight+gap*5,avail=echoP.clientHeight-fixed;
   const sh=Math.max(140,Math.min(pw/(WD/DMAX),avail));echoS.style.height=sh+'px';echoS.style.width=(sh*WD/DMAX)+'px';drawEchoOv();drawBull();}
 function setTab(t){ECHO.tab=t;ECHO.mm=t==='mm';if(t==='mm'){ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);}echoLayout();}
-function setEcho(on){ECHO.on=on;$('tEcho').textContent=on?'초음파 닫기':'심초음파';if(!on){ECam=null;EBa=null;controls.enableDamping=true;}document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
+const orient=new THREE.Group();orient.visible=false;heart.add(orient);
+{const cx=-.43,cz=-.8,ra=4.0,rb=2.75,y0=-3.6,y1=3.4;
+  const shell=new THREE.Mesh(new THREE.CylinderGeometry(1,1,y1-y0,48,1,true),new THREE.MeshBasicMaterial({color:0x9fdcff,transparent:true,opacity:.05,side:THREE.DoubleSide,depthWrite:false}));
+  shell.scale.set(ra,1,rb);shell.position.set(cx,(y0+y1)/2,cz);shell.renderOrder=1;orient.add(shell);
+  const lm=new THREE.LineBasicMaterial({color:0x9fdcff,transparent:true,opacity:.35});
+  for(let k=0;k<8;k++){const y=y1-.35-k*.82,pts=[];for(let i=0;i<=40;i++){const t=-1.25+2.5*i/40;pts.push(new V3(cx+Math.sin(t)*ra*.98,y-.25*(1-Math.cos(t)),cz+Math.cos(t)*rb*.98));}orient.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));}
+  const st=new THREE.Mesh(new THREE.BoxGeometry(.42,4.6,.08),new THREE.MeshBasicMaterial({color:0xcfe8ff,transparent:true,opacity:.18,depthWrite:false}));st.position.set(cx,y1-2.5,cz+rb);orient.add(st);
+  [[cx,y1+.45,cz+rb*.4,'머리 ↑','#cfe3ee'],[cx,y1-2.4,cz+rb+.35,'흉골','#cfe3ee'],[cx+ra+.5,0,cz+.6,'환자 왼쪽','#cfe3ee'],[cx-ra-.5,0,cz+.6,'환자 오른쪽','#cfe3ee']].forEach(q=>orient.add(textSprite(q[3],q[4],new V3(q[0],q[1],q[2]),.34)));}
+const CHAM=[['LV 좌심실',v3(LD.LVin),'#ff8a92'],['RV 우심실',v3(LD.RVin),'#8fb4ff'],['LA 좌심방',v3(LD.LAc),'#ffb0a8'],['RA 우심방',v3(LD.RAc),'#a9c8ff'],['Ao 대동맥',AOc.clone().addScaledVector(nAo,.5),'#ff9a9a']];
+CHAM.forEach(c=>{const s=textSprite(c[0].split(' ')[0],c[2],c[1],.26);s.material.depthTest=false;s.renderOrder=15;orient.add(s);});
+function textSprite(t,col,pos,h){const cv=document.createElement('canvas'),x=cv.getContext('2d');x.font='600 44px "IBM Plex Sans KR",sans-serif';const w=Math.ceil(x.measureText(t).width)+36;cv.width=w;cv.height=72;
+  x.fillStyle='rgba(4,10,16,.78)';x.beginPath();x.moveTo(14,2);x.arcTo(w-2,2,w-2,70,14);x.arcTo(w-2,70,2,70,14);x.arcTo(2,70,2,2,14);x.arcTo(2,2,w-2,2,14);x.closePath();x.fill();
+  x.font='600 44px "IBM Plex Sans KR",sans-serif';x.fillStyle=col;x.textBaseline='middle';x.fillText(t,18,38);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));sp.scale.set(h*w/72,h,1);sp.position.copy(pos);sp.renderOrder=15;return sp;}
+function setEcho(on){orient.visible=on;ECHO.on=on;$('tEcho').textContent=on?'초음파 닫기':'심초음파';if(!on){ECam=null;EBa=null;controls.enableDamping=true;}document.body.classList.toggle('echo-on',on);$('tEcho').setAttribute('aria-pressed',on);echoP.hidden=!on;view.classList.toggle('echo',on);probe.visible=on;tagBox.style.display=on?'none':'';
   if(on){echoReset();viewBasis(ECHO.view);camSwing(EB);ECHO.lastCol=-1;renderer.setRenderTarget(rtM);renderer.setClearColor(0,1);renderer.clear();renderer.setRenderTarget(null);requestAnimationFrame(()=>{echoLayout();});}
   else{renderer.setScissorTest(false);sizeAll();resetView();}}
 $('tEcho').addEventListener('click',()=>setEcho(!ECHO.on));

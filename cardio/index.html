@@ -171,6 +171,8 @@ dt{color:var(--dim)}dd{margin:0}
 #echoP{position:absolute;z-index:4;top:62px;right:12px;bottom:104px;width:min(54%,640px);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
 #echoP[hidden]{display:none}
 #echoP>*{pointer-events:auto}
+#echoP{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+#echoP::-webkit-scrollbar{display:none}
 #echoP>.ehead,#echoP>.efunc,#echoP>.etools,#echoS{flex:none}
 .ehead{display:flex;gap:6px;align-items:center;padding:4px;width:100%}
 .evs{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}
